@@ -29,7 +29,7 @@ export default function ConsultationDialog({
         </DialogHeader>
         <div className="flex flex-col gap-3 mt-4">
           <a
-            href="tel:+79518578775"
+            href="https://max.ru/u/f9LHodD0cOI-OzJpTa5P5MYG6df1ZnyUorMCs5GN9wRCwtojOsaacWvikPA"
             target="_blank"
             rel="noopener noreferrer"
           >
