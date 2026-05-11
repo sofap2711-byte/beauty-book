@@ -1,8 +1,19 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Cormorant_Garamond } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin", "cyrillic"], variable: "--font-sans" });
+const inter = Inter({
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-sans",
+  weight: ["300", "400", "500", "600"],
+});
+
+const cormorant = Cormorant_Garamond({
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-serif",
+  weight: ["300", "400", "600"],
+  style: ["normal", "italic"],
+});
 
 export const metadata: Metadata = {
   title: "BeautyBook — Онлайн-запись в салон красоты",
@@ -15,8 +26,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru">
-      <body className={`${inter.variable} font-sans antialiased`}>
+    <html lang="ru" className="scroll-smooth">
+      <body
+        className={`${inter.variable} ${cormorant.variable} font-sans antialiased bg-[#f8f9fa] text-slate-900`}
+      >
         {children}
       </body>
     </html>

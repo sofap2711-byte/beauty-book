@@ -56,18 +56,20 @@ const config: Config = {
           900: "#0f172a",
         },
         sky: {
+          200: "#bae6fd",
+          300: "#7dd3fc",
           400: "#38bdf8",
           500: "#0ea5e9",
         },
+      },
+      fontFamily: {
+        sans: ["var(--font-sans)", "Inter", "system-ui", "sans-serif"],
+        serif: ["var(--font-serif)", "Cormorant Garamond", "Georgia", "serif"],
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
-        "2xl": "1rem",
-      },
-      fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
       },
       keyframes: {
         "fade-in-up": {

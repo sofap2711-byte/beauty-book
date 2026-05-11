@@ -1,87 +1,161 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import Header from "@/components/Header";
-import IconByName from "@/components/IconByName";
-import { services } from "@/lib/data";
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import Nav from "@/components/Nav";
+import ServicesAccordion from "@/components/ServicesAccordion";
+import { Instagram, ArrowDown } from "lucide-react";
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-slate-100">
-      <Header />
+    <div className="min-h-screen bg-[#f8f9fa]">
+      <Nav />
 
-      <main className="max-w-5xl mx-auto px-4 py-8 md:py-12">
-        {/* Hero */}
-        <section className="text-center mb-12 md:mb-16">
-          <h1 className="text-3xl md:text-5xl font-extrabold text-slate-900 mb-4 leading-tight">
-            Запишись к лучшим мастерам
-          </h1>
-          <p className="text-base md:text-lg text-slate-500 mb-8 max-w-xl mx-auto">
-            Онлайн-запись в салон красоты за 2 минуты. Выбери услугу, мастера и
-            удобное время.
-          </p>
-          <Link href="#services">
-            <Button className="rounded-full bg-sky-400 hover:bg-sky-500 text-white px-8 py-6 text-base shadow-lg shadow-sky-400/20 transition-all hover:scale-105 active:scale-95">
-              Выбрать услугу
-              <ArrowRight className="ml-2 w-4 h-4" />
-            </Button>
-          </Link>
-        </section>
+      {/* Hero */}
+      <section className="relative h-screen min-h-[600px] flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 bg-slate-900">
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/40 via-slate-900/60 to-slate-900/90" />
+        </div>
 
-        {/* Services */}
-        <section id="services">
-          <h2 className="text-xl md:text-2xl font-bold text-slate-900 mb-6 text-center md:text-left">
-            Услуги
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {services.map((service) => (
-              <Card
-                key={service.id}
-                className="rounded-2xl border-0 shadow-lg bg-white hover:shadow-xl transition-shadow duration-300 group"
-              >
-                <CardHeader className="pb-3">
-                  <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mb-3 group-hover:bg-sky-50 transition-colors">
-                    <IconByName
-                      name={service.icon}
-                      className="w-6 h-6 text-slate-400 group-hover:text-sky-400 transition-colors"
-                    />
-                  </div>
-                  <CardTitle className="text-lg text-slate-900">
-                    {service.name}
-                  </CardTitle>
-                  <CardDescription className="text-slate-500 text-sm">
-                    {service.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-900 font-semibold">
-                      от {service.priceFrom.toLocaleString("ru-RU")}₽
-                    </span>
-                    <Link href={`/service/${service.id}`}>
-                      <Button
-                        variant="outline"
-                        className="rounded-full border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors"
-                      >
-                        Выбрать мастера
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+        <div className="relative z-10 text-center px-6 max-w-3xl mx-auto">
+          <div className="inline-flex items-center gap-2 text-sky-200/80 text-sm tracking-wide mb-6">
+            <span>★</span>
+            <span>5.0 рейтинг — 200+ отзывов</span>
           </div>
-        </section>
-      </main>
+
+          <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl text-white font-300 leading-[0.95] tracking-tight">
+            Beauty
+            <br />
+            <span className="italic">Book</span>
+          </h1>
+
+          <p className="text-slate-300 text-lg md:text-xl mt-6 font-300 tracking-wide">
+            Салон красоты премиум-класса
+          </p>
+          <p className="text-slate-400 text-sm md:text-base mt-3 max-w-md mx-auto leading-relaxed">
+            Естественная красота без перегруженности.
+            <br />
+            Современный подход с деликатным вниманием к деталям.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-10">
+            <a
+              href="#services"
+              className="px-8 py-3 bg-white text-slate-900 text-sm tracking-wide hover:bg-sky-50 transition-colors"
+            >
+              Записаться
+            </a>
+            <a
+              href="https://t.me/sofi_sofi_27"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-8 py-3 border border-slate-600 text-white text-sm tracking-wide hover:bg-white/10 transition-colors"
+            >
+              Консультация
+            </a>
+          </div>
+        </div>
+
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-slate-500 animate-bounce">
+          <ArrowDown className="w-5 h-5" />
+        </div>
+      </section>
+
+      {/* About */}
+      <section id="about" className="py-24 md:py-32 bg-[#f8f9fa]">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-20 items-center">
+            <div className="order-2 md:order-1">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-400 mb-4">
+                О салоне
+              </div>
+              <h2 className="font-serif text-4xl md:text-5xl text-slate-900 font-300 leading-tight">
+                Место, где
+                <br />
+                <span className="italic">доверяют</span>
+              </h2>
+              <p className="text-slate-500 mt-6 leading-relaxed">
+                Наша задача — подчеркнуть естественную красоту и сохранить гармонию.
+                Мы не делаем «маску», мы работаем с тем, что есть, усиливая ваши лучшие черты.
+              </p>
+              <p className="text-slate-500 mt-4 leading-relaxed">
+                Профессиональная команда, 8 лет практики, премиальные препараты
+                и современное оборудование.
+              </p>
+
+              <div className="grid grid-cols-3 gap-6 mt-10 pt-10 border-t border-slate-200">
+                <div>
+                  <div className="font-serif text-3xl text-slate-900">1000+</div>
+                  <div className="text-xs text-slate-400 mt-1 uppercase tracking-wider">Клиентов</div>
+                </div>
+                <div>
+                  <div className="font-serif text-3xl text-slate-900">8 лет</div>
+                  <div className="text-xs text-slate-400 mt-1 uppercase tracking-wider">Практики</div>
+                </div>
+                <div>
+                  <div className="font-serif text-3xl text-slate-900">95%</div>
+                  <div className="text-xs text-slate-400 mt-1 uppercase tracking-wider">Возвращаются</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="order-1 md:order-2">
+              <div className="aspect-[4/5] bg-slate-200 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-300/50 to-transparent" />
+                <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-serif text-2xl italic">
+                  фото салона
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Services */}
+      <ServicesAccordion />
+
+      {/* CTA */}
+      <section className="relative py-24 md:py-32 bg-slate-900 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900" />
+        <div className="relative z-10 text-center px-6 max-w-2xl mx-auto">
+          <h2 className="font-serif text-4xl md:text-5xl text-white font-300">
+            Запишитесь на
+            <br />
+            <span className="italic">удобное время</span>
+          </h2>
+          <p className="text-slate-400 mt-6">
+            Выберите услугу и мастера, а мы подберём идеальное время
+          </p>
+          <a
+            href="#services"
+            className="inline-block mt-8 px-8 py-3 bg-white text-slate-900 text-sm tracking-wide hover:bg-sky-50 transition-colors"
+          >
+            Выбрать услугу
+          </a>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-16 bg-[#f8f9fa] border-t border-slate-200">
+        <div className="max-w-6xl mx-auto px-6 text-center">
+          <div className="font-serif text-2xl text-slate-900 mb-2">
+            BeautyBook <span className="italic text-slate-500 text-lg">Aesthetics</span>
+          </div>
+          <p className="text-sm text-slate-400 mb-6">
+            Онлайн-запись в салон красоты премиум-класса
+          </p>
+          <a
+            href="https://instagram.com/beautybook"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm"
+          >
+            <Instagram className="w-4 h-4" />
+            <span>@beautybook</span>
+          </a>
+          <div className="mt-10 text-xs text-slate-300">
+            © {new Date().getFullYear()} BeautyBook. Все права защищены.
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

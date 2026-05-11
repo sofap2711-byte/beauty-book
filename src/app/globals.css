@@ -4,26 +4,26 @@
 
 @layer base {
   :root {
-    --background: 210 40% 96%;
+    --background: 0 0% 97.6%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 199 89% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 214 32% 91%;
+    --primary: 200 90% 70%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 210 20% 94%;
     --secondary-foreground: 215 16% 34%;
-    --muted: 210 40% 96%;
+    --muted: 210 20% 96%;
     --muted-foreground: 215 16% 47%;
-    --accent: 214 32% 91%;
+    --accent: 210 20% 94%;
     --accent-foreground: 222 47% 11%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 84%;
-    --input: 214 32% 84%;
-    --ring: 199 89% 60%;
-    --radius: 0.75rem;
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 200 90% 70%;
+    --radius: 0.5rem;
   }
 
   * {
@@ -32,5 +32,9 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-serif), serif;
   }
 }
