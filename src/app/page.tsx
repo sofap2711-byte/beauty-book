@@ -184,7 +184,7 @@ export default function HomePage() {
           </div>
 
           <a
-            href="https://instagram.com/beautybook"
+            href="https://www.instagram.com/sofi_markelova_?igsh=MWY5dWVkdjBxMjd2Yw=="
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block mt-10 px-8 py-3 border border-slate-300 text-slate-700 text-sm tracking-wide hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all"
