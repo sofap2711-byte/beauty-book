@@ -4,15 +4,9 @@ import { useParams, notFound } from "next/navigation";
 import Link from "next/link";
 import { getCategoryById, getMastersByCategoryId } from "@/lib/data";
 import Nav from "@/components/Nav";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import ConsultationDialog from "@/components/ConsultationDialog";
 import { Button } from "@/components/ui/button";
-import { Star, Instagram, MessageCircle, ArrowLeft, Calendar } from "lucide-react";
+import { Star, Instagram, ArrowLeft, Calendar } from "lucide-react";
 
 export default function ServicePage() {
   const params = useParams();
@@ -85,44 +79,17 @@ export default function ServicePage() {
               </div>
 
               <div className="flex flex-wrap gap-3 mt-6 pt-6 border-t border-slate-100">
-                <Dialog>
-                  <DialogTrigger asChild>
+                <ConsultationDialog
+                  masterName={master.name}
+                  trigger={
                     <Button
                       variant="outline"
                       className="rounded-none border-slate-300 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all text-sm"
                     >
-                      <MessageCircle className="w-4 h-4 mr-2" />
                       Консультация
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent className="rounded-none bg-white border border-slate-200 shadow-2xl max-w-sm">
-                    <DialogHeader>
-                      <DialogTitle className="font-serif text-slate-900 text-xl">
-                        Связаться с {master.name}
-                      </DialogTitle>
-                    </DialogHeader>
-                    <div className="flex flex-col gap-3 mt-4">
-                      <a
-                        href="https://max.ru"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Button className="w-full rounded-none bg-slate-900 hover:bg-slate-800 text-white">
-                          MAX
-                        </Button>
-                      </a>
-                      <a
-                        href="https://t.me/username"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Button className="w-full rounded-none bg-sky-300 hover:bg-sky-400 text-slate-900">
-                          Telegram
-                        </Button>
-                      </a>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                  }
+                />
 
                 <Link href={`/master/${master.id}/book`}>
                   <Button className="rounded-none bg-slate-900 hover:bg-slate-800 text-white text-sm transition-colors">

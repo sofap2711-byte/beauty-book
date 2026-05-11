@@ -2,7 +2,9 @@
 
 import Nav from "@/components/Nav";
 import ServicesAccordion from "@/components/ServicesAccordion";
+import ConsultationDialog from "@/components/ConsultationDialog";
 import { Instagram, ArrowDown } from "lucide-react";
+import Link from "next/link";
 
 export default function HomePage() {
   return (
@@ -43,14 +45,13 @@ export default function HomePage() {
             >
               Записаться
             </a>
-            <a
-              href="https://t.me/sofi_sofi_27"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-8 py-3 border border-slate-600 text-white text-sm tracking-wide hover:bg-white/10 transition-colors"
-            >
-              Консультация
-            </a>
+            <ConsultationDialog
+              trigger={
+                <button className="px-8 py-3 border border-slate-600 text-white text-sm tracking-wide hover:bg-white/10 transition-colors">
+                  Консультация
+                </button>
+              }
+            />
           </div>
         </div>
 
@@ -142,15 +143,23 @@ export default function HomePage() {
           <p className="text-sm text-slate-400 mb-6">
             Онлайн-запись в салон красоты премиум-класса
           </p>
-          <a
-            href="https://instagram.com/beautybook"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm"
-          >
-            <Instagram className="w-4 h-4" />
-            <span>@beautybook</span>
-          </a>
+          <div className="flex items-center justify-center gap-6 mb-6">
+            <Link
+              href="/gallery"
+              className="text-sm text-slate-500 hover:text-slate-900 transition-colors"
+            >
+              Галерея работ
+            </Link>
+            <a
+              href="https://instagram.com/beautybook"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm"
+            >
+              <Instagram className="w-4 h-4" />
+              <span>@beautybook</span>
+            </a>
+          </div>
           <div className="mt-10 text-xs text-slate-300">
             © {new Date().getFullYear()} BeautyBook. Все права защищены.
           </div>

@@ -18,6 +18,16 @@ interface BookingDialogProps {
   masterName: string;
 }
 
+function validatePhone(phone: string): { valid: boolean; message?: string } {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) return { valid: true };
+  if (digits.length === 11 && digits.startsWith("7")) return { valid: true };
+  return {
+    valid: false,
+    message: "Введите 10 цифр номера (без +7)",
+  };
+}
+
 export default function BookingDialog({
   trigger,
   date,
@@ -32,14 +42,24 @@ export default function BookingDialog({
     telegram: "",
     comment: "",
   });
+  const [phoneError, setPhoneError] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setPhoneError("");
+
+    const phoneCheck = validatePhone(form.phone);
+    if (!phoneCheck.valid) {
+      setPhoneError(phoneCheck.message || "Неверный номер");
+      return;
+    }
+
     setSubmitted(true);
     setTimeout(() => {
       setOpen(false);
       setSubmitted(false);
       setForm({ name: "", phone: "+7", telegram: "", comment: "" });
+      setPhoneError("");
     }, 1500);
   };
 
@@ -105,11 +125,20 @@ export default function BookingDialog({
               <Input
                 required
                 type="tel"
+                inputMode="numeric"
                 value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, phone: e.target.value });
+                  setPhoneError("");
+                }}
                 placeholder="+7 (999) 000-00-00"
-                className="rounded-none border-slate-200 focus:border-sky-300 focus:ring-sky-200"
+                className={`rounded-none border-slate-200 focus:border-sky-300 focus:ring-sky-200 ${
+                  phoneError ? "border-red-300" : ""
+                }`}
               />
+              {phoneError && (
+                <p className="text-xs text-red-400 mt-1">{phoneError}</p>
+              )}
             </div>
             <div>
               <label className="text-xs uppercase tracking-wider text-slate-400 mb-2 block">
