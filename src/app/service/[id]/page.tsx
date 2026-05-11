@@ -1,21 +1,46 @@
 "use client";
 
 import { useParams, notFound } from "next/navigation";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { getCategoryById, getMastersByCategoryId } from "@/lib/data";
+import { getServiceById, getMastersByService } from "@/app/actions";
 import Nav from "@/components/Nav";
 import ConsultationDialog from "@/components/ConsultationDialog";
 import { Button } from "@/components/ui/button";
 import { Star, Instagram, ArrowLeft, Calendar } from "lucide-react";
+import type { Service, Master } from "@prisma/client";
 
 export default function ServicePage() {
   const params = useParams();
   const categoryId = params.id as string;
-  const category = getCategoryById(categoryId);
-  const serviceMasters = getMastersByCategoryId(categoryId);
 
-  if (!category) {
+  const [category, setCategory] = useState<Service | null>(null);
+  const [serviceMasters, setServiceMasters] = useState<Master[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([getServiceById(categoryId), getMastersByService(categoryId)]).then(
+      ([cat, masters]) => {
+        setCategory(cat);
+        setServiceMasters(masters);
+        setLoading(false);
+      }
+    );
+  }, [categoryId]);
+
+  if (!loading && !category) {
     notFound();
+  }
+
+  if (loading || !category) {
+    return (
+      <div className="min-h-screen bg-[#f8f9fa]">
+        <Nav />
+        <main className="max-w-5xl mx-auto px-6 pt-28 pb-20 text-center text-slate-400 text-sm">
+          Загрузка...
+        </main>
+      </div>
+    );
   }
 
   return (
@@ -33,7 +58,7 @@ export default function ServicePage() {
 
         <div className="mb-12">
           <div className="text-xs uppercase tracking-[0.2em] text-slate-400 mb-3">
-            {category.subServices.length} услуг
+            {serviceMasters.length} мастеров
           </div>
           <h1 className="font-serif text-4xl md:text-5xl text-slate-900 font-300">
             {category.name}
@@ -53,11 +78,9 @@ export default function ServicePage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-1">
-                    <h3 className="font-serif text-xl text-slate-900">
-                      {master.name}
-                    </h3>
+                    <h3 className="font-serif text-xl text-slate-900">{master.name}</h3>
                     <a
-                      href={`https://instagram.com/${master.instagram}`}
+                      href={master.instagram ? `https://instagram.com/${master.instagram}` : "#"}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-slate-300 hover:text-pink-500 transition-colors"
@@ -69,10 +92,7 @@ export default function ServicePage() {
                   <p className="text-sm text-slate-500">{master.role}</p>
                   <div className="flex items-center gap-0.5 mt-2">
                     {Array.from({ length: master.rating }).map((_, i) => (
-                      <Star
-                        key={i}
-                        className="w-3.5 h-3.5 fill-amber-400 text-amber-400"
-                      />
+                      <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                     ))}
                   </div>
                 </div>

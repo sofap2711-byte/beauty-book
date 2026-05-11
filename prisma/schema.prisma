@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Service {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  category    String
+  subServices SubService[]
+  masters     Master[]
+  createdAt   DateTime @default(now())
+}
+
+model SubService {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  price       String
+  serviceId   String
+  service     Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Master {
+  id          String   @id @default(uuid())
+  name        String
+  photo       String?
+  role        String
+  rating      Int      @default(5)
+  instagram   String?
+  workDays    String
+  startTime   String
+  endTime     String
+  breakStart  String?
+  breakEnd    String?
+  serviceId   String
+  service     Service  @relation(fields: [serviceId], references: [id])
+  slots       Slot[]
+}
+
+model Slot {
+  id          String   @id @default(uuid())
+  masterId    String
+  master      Master   @relation(fields: [masterId], references: [id])
+  date        String
+  time        String
+  status      String   @default("free")
+  clientName  String?
+  clientPhone String?
+  clientTg    String?
+  comment     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([masterId, date, time])
+}

@@ -38,3 +38,7 @@ next-env.d.ts
 
 # agent / secret context
 /.kimi/
+
+/src/generated/prisma
+*.db
+*.log

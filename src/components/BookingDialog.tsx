@@ -10,12 +10,16 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { createBooking } from "@/app/actions";
+import { toast } from "sonner";
 
 interface BookingDialogProps {
   trigger: React.ReactNode;
+  slotId: string;
   date: string;
   time: string;
   masterName: string;
+  onSuccess?: () => void;
 }
 
 function validatePhone(phone: string): { valid: boolean; message?: string } {
@@ -30,9 +34,11 @@ function validatePhone(phone: string): { valid: boolean; message?: string } {
 
 export default function BookingDialog({
   trigger,
+  slotId,
   date,
   time,
   masterName,
+  onSuccess,
 }: BookingDialogProps) {
   const [open, setOpen] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -43,8 +49,9 @@ export default function BookingDialog({
     comment: "",
   });
   const [phoneError, setPhoneError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPhoneError("");
 
@@ -54,13 +61,36 @@ export default function BookingDialog({
       return;
     }
 
-    setSubmitted(true);
-    setTimeout(() => {
+    setSubmitting(true);
+    try {
+      await createBooking(
+        slotId,
+        form.name,
+        form.phone,
+        form.telegram || undefined,
+        form.comment || undefined
+      );
+      setSubmitted(true);
+      toast.success("Запись подтверждена!");
+      setTimeout(() => {
+        setOpen(false);
+        setSubmitted(false);
+        setForm({ name: "", phone: "+7", telegram: "", comment: "" });
+        setPhoneError("");
+        onSuccess?.();
+      }, 1500);
+    } catch (err) {
+      let msg = "Ошибка при записи";
+      if (err instanceof Error) msg = err.message;
+      if (msg.includes("уже занят")) {
+        toast.error("Извините, это время только что заняли");
+      } else {
+        toast.error(msg);
+      }
       setOpen(false);
-      setSubmitted(false);
-      setForm({ name: "", phone: "+7", telegram: "", comment: "" });
-      setPhoneError("");
-    }, 1500);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -75,22 +105,12 @@ export default function BookingDialog({
         {submitted ? (
           <div className="py-10 text-center">
             <div className="w-12 h-12 border border-sky-300 flex items-center justify-center mx-auto mb-4">
-              <svg
-                className="w-6 h-6 text-sky-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M5 13l4 4L19 7"
-                />
+              <svg className="w-6 h-6 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7" />
               </svg>
             </div>
             <p className="font-serif text-xl text-slate-900">Запись успешна!</p>
-            <p className="text-slate-400 text-sm mt-1">(Демо-режим)</p>
+            <p className="text-slate-400 text-sm mt-1">Ожидайте подтверждения</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-5 mt-4">
@@ -136,9 +156,7 @@ export default function BookingDialog({
                   phoneError ? "border-red-300" : ""
                 }`}
               />
-              {phoneError && (
-                <p className="text-xs text-red-400 mt-1">{phoneError}</p>
-              )}
+              {phoneError && <p className="text-xs text-red-400 mt-1">{phoneError}</p>}
             </div>
             <div>
               <label className="text-xs uppercase tracking-wider text-slate-400 mb-2 block">
@@ -146,9 +164,7 @@ export default function BookingDialog({
               </label>
               <Input
                 value={form.telegram}
-                onChange={(e) =>
-                  setForm({ ...form, telegram: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, telegram: e.target.value })}
                 placeholder="@ник"
                 className="rounded-none border-slate-200 focus:border-sky-300 focus:ring-sky-200"
               />
@@ -159,9 +175,7 @@ export default function BookingDialog({
               </label>
               <textarea
                 value={form.comment}
-                onChange={(e) =>
-                  setForm({ ...form, comment: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, comment: e.target.value })}
                 placeholder="Особые пожелания..."
                 rows={3}
                 className="w-full rounded-none border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-200 transition-colors resize-none"
@@ -169,9 +183,10 @@ export default function BookingDialog({
             </div>
             <Button
               type="submit"
+              disabled={submitting}
               className="rounded-none bg-slate-900 hover:bg-slate-800 text-white transition-colors mt-1"
             >
-              Подтвердить запись
+              {submitting ? "Отправка..." : "Подтвердить запись"}
             </Button>
           </form>
         )}
