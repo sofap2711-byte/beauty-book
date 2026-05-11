@@ -33,15 +33,20 @@ export default function ServicesAccordion() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getServices().then((data) => {
-      setServices(data);
-      const map: Record<string, SubService[]> = {};
-      data.forEach((s) => {
-        map[s.id] = (s as Service & { subServices: SubService[] }).subServices ?? [];
+    getServices()
+      .then((data) => {
+        setServices(data);
+        const map: Record<string, SubService[]> = {};
+        data.forEach((s) => {
+          map[s.id] = (s as Service & { subServices: SubService[] }).subServices ?? [];
+        });
+        setSubServicesMap(map);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to load services:", err);
+        setLoading(false);
       });
-      setSubServicesMap(map);
-      setLoading(false);
-    });
   }, []);
 
   if (loading) {

@@ -4,41 +4,66 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
 export async function getServiceById(id: string) {
-  return prisma.service.findUnique({
+  try {
+    return await prisma.service.findUnique({
     where: { id },
     include: { subServices: true, masters: true },
-  });
+    });
+  } catch (err) {
+    console.error("[getServiceById] error:", err);
+    throw err;
+  }
 }
 
 export async function getMasterById(id: string) {
-  return prisma.master.findUnique({
+  try {
+    return await prisma.master.findUnique({
     where: { id },
     include: { service: true },
-  });
+    });
+  } catch (err) {
+    console.error("[getMasterById] error:", err);
+    throw err;
+  }
 }
 
 export async function getServices() {
-  return prisma.service.findMany({
+  try {
+    return await prisma.service.findMany({
     include: {
       subServices: true,
       masters: true,
     },
     orderBy: { createdAt: "asc" },
-  });
+    });
+  } catch (err) {
+    console.error("[getServices] error:", err);
+    throw err;
+  }
 }
 
 export async function getMastersByService(serviceId: string) {
-  return prisma.master.findMany({
+  try {
+    return await prisma.master.findMany({
     where: { serviceId },
     orderBy: { name: "asc" },
-  });
+    });
+  } catch (err) {
+    console.error("[getMastersByService] error:", err);
+    throw err;
+  }
 }
 
 export async function getMasterSlots(masterId: string, date: string) {
-  return prisma.slot.findMany({
+  try {
+    return await prisma.slot.findMany({
     where: { masterId, date },
     orderBy: { time: "asc" },
-  });
+    });
+  } catch (err) {
+    console.error("[getMasterSlots] error:", err);
+    throw err;
+  }
 }
 
 export async function createBooking(

@@ -19,13 +19,16 @@ export default function ServicePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([getServiceById(categoryId), getMastersByService(categoryId)]).then(
-      ([cat, masters]) => {
+    Promise.all([getServiceById(categoryId), getMastersByService(categoryId)])
+      .then(([cat, masters]) => {
         setCategory(cat);
         setServiceMasters(masters);
         setLoading(false);
-      }
-    );
+      })
+      .catch((err) => {
+        console.error("Failed to load service/masters:", err);
+        setLoading(false);
+      });
   }, [categoryId]);
 
   if (!loading && !category) {

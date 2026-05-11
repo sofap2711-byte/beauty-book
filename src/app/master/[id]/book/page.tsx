@@ -22,10 +22,15 @@ export default function BookPage() {
   const [slotsLoading, setSlotsLoading] = useState(false);
 
   useEffect(() => {
-    getMasterById(masterId).then((m) => {
-      setMaster(m);
-      setLoading(false);
-    });
+    getMasterById(masterId)
+      .then((m) => {
+        setMaster(m);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to load master:", err);
+        setLoading(false);
+      });
   }, [masterId]);
 
   const loadSlots = useCallback(
