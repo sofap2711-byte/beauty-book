@@ -39,12 +39,7 @@ export default function Nav() {
           >
             Услуги
           </button>
-          <Link
-            href="/gallery"
-            className="text-sm text-slate-600 hover:text-slate-900 transition-colors tracking-wide"
-          >
-            Галерея
-          </Link>
+
           <button
             onClick={() => scrollToSection("services")}
             className="text-sm px-5 py-2 bg-slate-900 text-white hover:bg-slate-800 transition-colors tracking-wide"
@@ -76,13 +71,7 @@ export default function Nav() {
           >
             Услуги
           </button>
-          <Link
-            href="/gallery"
-            onClick={() => setOpen(false)}
-            className="text-base text-slate-700 hover:text-slate-900 transition-colors"
-          >
-            Галерея
-          </Link>
+
           <button
             onClick={() => handleLink("services")}
             className="text-base px-5 py-3 bg-slate-900 text-white text-center hover:bg-slate-800 transition-colors"
