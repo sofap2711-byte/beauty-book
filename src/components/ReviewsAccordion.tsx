@@ -2,12 +2,21 @@
 
 import { useState } from "react";
 import { reviews } from "@/lib/data";
-import { Star, ChevronDown, Send } from "lucide-react";
+import { Star, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export default function ReviewsAccordion() {
-  const [open, setOpen] = useState(false);
+interface ReviewsAccordionProps {
+  open?: boolean;
+  onToggle?: () => void;
+}
+
+export default function ReviewsAccordion({ open, onToggle }: ReviewsAccordionProps) {
+  const isControlled = open !== undefined && onToggle !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isOpen = isControlled ? open : internalOpen;
+  const toggle = isControlled ? onToggle : () => setInternalOpen(!internalOpen);
+
   const [submitted, setSubmitted] = useState(false);
   const [form, setForm] = useState({ name: "", text: "" });
 
@@ -22,40 +31,51 @@ export default function ReviewsAccordion() {
   };
 
   return (
-    <div className="border-t border-slate-200">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between py-5 text-left group"
-      >
-        <span className="font-serif text-xl text-slate-900">Отзывы</span>
-        <ChevronDown
-          className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${
-            open ? "rotate-180" : ""
-          }`}
-        />
-      </button>
+    <div>
+      {/* Если не controlled — показываем свой заголовок (для страниц мастеров и т.д.) */}
+      {!isControlled && (
+        <button
+          onClick={toggle}
+          className="w-full flex items-center justify-between py-5 text-left group border-t border-slate-200"
+        >
+          <span className="font-serif text-xl text-slate-900">Отзывы</span>
+          <svg
+            className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${
+              isOpen ? "rotate-180" : ""
+            }`}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+      )}
 
       <div
         className={`overflow-hidden transition-all duration-500 ease-out ${
-          open ? "max-h-[1200px] opacity-100 pb-8" : "max-h-0 opacity-0"
+          isOpen ? "max-h-[1200px] opacity-100 pb-8" : "max-h-0 opacity-0"
         }`}
       >
-        <div className="space-y-6">
+        <div className="space-y-6 pt-4">
           {reviews.map((review) => (
             <div
               key={review.id}
-              className="bg-white border border-slate-100 p-5"
+              className="bg-white/5 border border-white/10 p-5"
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-slate-200 flex items-center justify-center text-slate-500 text-sm font-serif">
+                  <div className="w-8 h-8 bg-white/10 flex items-center justify-center text-white/60 text-sm font-serif">
                     {review.name.charAt(0)}
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-slate-900">
+                    <div className="text-sm font-medium text-white">
                       {review.name}
                     </div>
-                    <div className="text-xs text-slate-400">
+                    <div className="text-xs text-white/40">
                       {new Date(review.date).toLocaleDateString("ru-RU", {
                         day: "numeric",
                         month: "long",
@@ -73,15 +93,15 @@ export default function ReviewsAccordion() {
                   ))}
                 </div>
               </div>
-              <p className="text-sm text-slate-600 leading-relaxed">
+              <p className="text-sm text-white/70 leading-relaxed">
                 {review.text}
               </p>
             </div>
           ))}
         </div>
 
-        <div className="mt-8 pt-8 border-t border-slate-200">
-          <h4 className="font-serif text-lg text-slate-900 mb-4">
+        <div className="mt-8 pt-8 border-t border-white/10">
+          <h4 className="font-serif text-lg text-white mb-4">
             Оставить отзыв
           </h4>
           {submitted ? (
@@ -101,7 +121,7 @@ export default function ReviewsAccordion() {
                   />
                 </svg>
               </div>
-              <p className="text-slate-900 text-sm">Спасибо за отзыв!</p>
+              <p className="text-white text-sm">Спасибо за отзыв!</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -110,7 +130,7 @@ export default function ReviewsAccordion() {
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Ваше имя"
-                className="rounded-none border-slate-200 focus:border-sky-300 focus:ring-sky-200"
+                className="rounded-none bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-sky-300 focus:ring-sky-200"
               />
               <textarea
                 required
@@ -118,11 +138,11 @@ export default function ReviewsAccordion() {
                 onChange={(e) => setForm({ ...form, text: e.target.value })}
                 placeholder="Ваш отзыв..."
                 rows={4}
-                className="w-full rounded-none border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-200 transition-colors resize-none"
+                className="w-full rounded-none bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-200 transition-colors resize-none"
               />
               <Button
                 type="submit"
-                className="rounded-none bg-slate-900 hover:bg-slate-800 text-white transition-colors w-full sm:w-auto self-start"
+                className="rounded-none bg-white text-slate-900 hover:bg-sky-50 transition-colors w-full sm:w-auto self-start"
               >
                 <Send className="w-4 h-4 mr-2" />
                 Отправить

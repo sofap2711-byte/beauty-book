@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Nav from "@/components/Nav";
 import ServicesAccordion from "@/components/ServicesAccordion";
 import ConsultationDialog from "@/components/ConsultationDialog";
@@ -7,6 +8,8 @@ import ReviewsAccordion from "@/components/ReviewsAccordion";
 import { ArrowDown } from "lucide-react";
 
 export default function HomePage() {
+  const [showReviews, setShowReviews] = useState(false);
+
   return (
     <div className="min-h-screen bg-[#f8f9fa]">
       <Nav />
@@ -134,22 +137,23 @@ export default function HomePage() {
                 Выбрать услугу
               </a>
               <button
-                onClick={() => {
-                  const el = document.getElementById("reviews-block");
-                  if (el) el.scrollIntoView({ behavior: "smooth" });
-                }}
-                className="px-8 py-3 border border-slate-600 text-white text-sm tracking-wide hover:bg-white/10 transition-colors"
+                onClick={() => setShowReviews(!showReviews)}
+                className={`px-8 py-3 border text-sm tracking-wide transition-colors ${
+                  showReviews
+                    ? "bg-white/10 border-white/30 text-white"
+                    : "border-slate-600 text-white hover:bg-white/10"
+                }`}
               >
-                Отзывы
+                {showReviews ? "Скрыть отзывы" : "Отзывы"}
               </button>
             </div>
           </div>
 
-          <div id="reviews-block" className="mt-16 bg-white/5 backdrop-blur-sm border border-white/10">
-            <div className="px-6 py-1">
-              <ReviewsAccordion />
+          {showReviews && (
+            <div className="mt-12 bg-white/5 backdrop-blur-sm border border-white/10 px-6 py-6 animate-fade-in-up">
+              <ReviewsAccordion open={true} onToggle={() => {}} />
             </div>
-          </div>
+          )}
         </div>
       </section>
 
