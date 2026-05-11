@@ -3,8 +3,8 @@
 import Nav from "@/components/Nav";
 import ServicesAccordion from "@/components/ServicesAccordion";
 import ConsultationDialog from "@/components/ConsultationDialog";
-import { Instagram, ArrowDown } from "lucide-react";
-import Link from "next/link";
+import ReviewsAccordion from "@/components/ReviewsAccordion";
+import { ArrowDown } from "lucide-react";
 
 export default function HomePage() {
   return (
@@ -113,54 +113,93 @@ export default function HomePage() {
       {/* Services */}
       <ServicesAccordion />
 
-      {/* CTA */}
+      {/* CTA + Reviews */}
       <section className="relative py-24 md:py-32 bg-slate-900 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900" />
-        <div className="relative z-10 text-center px-6 max-w-2xl mx-auto">
-          <h2 className="font-serif text-4xl md:text-5xl text-white font-300">
-            Запишитесь на
-            <br />
-            <span className="italic">удобное время</span>
+        <div className="relative z-10 max-w-2xl mx-auto px-6">
+          <div className="text-center">
+            <h2 className="font-serif text-4xl md:text-5xl text-white font-300">
+              Запишитесь на
+              <br />
+              <span className="italic">удобное время</span>
+            </h2>
+            <p className="text-slate-400 mt-6">
+              Выберите услугу и мастера, а мы подберём идеальное время
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
+              <a
+                href="#services"
+                className="px-8 py-3 bg-white text-slate-900 text-sm tracking-wide hover:bg-sky-50 transition-colors"
+              >
+                Выбрать услугу
+              </a>
+              <button
+                onClick={() => {
+                  const el = document.getElementById("reviews-block");
+                  if (el) el.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="px-8 py-3 border border-slate-600 text-white text-sm tracking-wide hover:bg-white/10 transition-colors"
+              >
+                Отзывы
+              </button>
+            </div>
+          </div>
+
+          <div id="reviews-block" className="mt-16 bg-white/5 backdrop-blur-sm border border-white/10">
+            <div className="px-6 py-1">
+              <ReviewsAccordion />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Instagram */}
+      <section className="py-24 md:py-32 bg-[#f8f9fa]">
+        <div className="max-w-3xl mx-auto px-6 text-center">
+          <div className="text-xs uppercase tracking-[0.25em] text-slate-400 mb-4">
+            Instagram
+          </div>
+          <h2 className="font-serif text-3xl md:text-4xl text-slate-900 font-300 mb-2">
+            Работы и жизнь
           </h2>
-          <p className="text-slate-400 mt-6">
-            Выберите услугу и мастера, а мы подберём идеальное время
+          <p className="font-serif text-xl text-slate-500 italic mb-10">
+            салона
           </p>
+
+          <div className="grid grid-cols-3 gap-3 md:gap-4">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div
+                key={i}
+                className="aspect-square bg-slate-200 flex items-center justify-center"
+              >
+                <span className="text-xs text-slate-400 uppercase tracking-wider">
+                  фото
+                </span>
+              </div>
+            ))}
+          </div>
+
           <a
-            href="#services"
-            className="inline-block mt-8 px-8 py-3 bg-white text-slate-900 text-sm tracking-wide hover:bg-sky-50 transition-colors"
+            href="https://instagram.com/beautybook"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block mt-10 px-8 py-3 border border-slate-300 text-slate-700 text-sm tracking-wide hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all"
           >
-            Выбрать услугу
+            Смотреть Instagram
           </a>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-16 bg-[#f8f9fa] border-t border-slate-200">
+      <footer className="py-16 bg-slate-900">
         <div className="max-w-6xl mx-auto px-6 text-center">
-          <div className="font-serif text-2xl text-slate-900 mb-2">
+          <div className="font-serif text-2xl text-white mb-2">
             BeautyBook <span className="italic text-slate-500 text-lg">Aesthetics</span>
           </div>
-          <p className="text-sm text-slate-400 mb-6">
+          <p className="text-sm text-slate-500 mb-8">
             Онлайн-запись в салон красоты премиум-класса
           </p>
-          <div className="flex items-center justify-center gap-6 mb-6">
-            <Link
-              href="/gallery"
-              className="text-sm text-slate-500 hover:text-slate-900 transition-colors"
-            >
-              Галерея работ
-            </Link>
-            <a
-              href="https://instagram.com/beautybook"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm"
-            >
-              <Instagram className="w-4 h-4" />
-              <span>@beautybook</span>
-            </a>
-          </div>
-          <div className="mt-10 text-xs text-slate-300">
+          <div className="mt-10 text-xs text-slate-600">
             © {new Date().getFullYear()} BeautyBook. Все права защищены.
           </div>
         </div>
