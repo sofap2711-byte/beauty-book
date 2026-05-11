@@ -33,7 +33,7 @@ async function main() {
       category: "Парикмахерские услуги",
       subServices: [
         { id: "melirovanie", name: "Мелирование", description: "Классическое, airtouch, балаяж", price: "от 2 500₽" },
-        { id: "tonirovanie", name: "Тонирование", description: "Полное или局部", price: "от 1 800₽" },
+        { id: "tonirovanie", name: "Тонирование", description: "Полное или локальное", price: "от 1 800₽" },
         { id: "okrashivanie-v-odin-ton", name: "Окрашивание в один тон", description: "Краситель премиум-класса", price: "от 2 000₽" },
         { id: "blondirovanie", name: "Блондирование", description: "Сложное осветление", price: "от 3 500₽" },
         { id: "shatush", name: "Шатуш", description: "Мягкое растяжение цвета", price: "от 3 000₽" },
@@ -113,6 +113,7 @@ async function main() {
   ];
 
   const today = new Date();
+  const slotsBatch: any[] = [];
 
   for (const s of servicesData) {
     const service = await prisma.service.create({
@@ -170,23 +171,30 @@ async function main() {
         for (const time of timeLabels) {
           const r = rand(seed++);
           const isBooked = r < 0.3;
-          await prisma.slot.create({
-            data: {
-              masterId: master.id,
-              date: dateStr,
-              time,
-              status: isBooked ? "booked" : "free",
-              clientName: isBooked ? "Демо-клиент" : null,
-              clientPhone: isBooked ? "+79991234567" : null,
-              clientTg: isBooked ? "@demo" : null,
-            },
+          slotsBatch.push({
+            masterId: master.id,
+            date: dateStr,
+            time,
+            status: isBooked ? "booked" : "free",
+            clientName: isBooked ? "Демо-клиент" : null,
+            clientPhone: isBooked ? "+79991234567" : null,
+            clientTg: isBooked ? "@demo" : null,
           });
         }
       }
     }
   }
 
-  console.log("Seed completed successfully");
+  // Batch insert all slots at once for speed
+  const batchSize = 500;
+  for (let i = 0; i < slotsBatch.length; i += batchSize) {
+    await prisma.slot.createMany({
+      data: slotsBatch.slice(i, i + batchSize),
+      skipDuplicates: true,
+    });
+  }
+
+  console.log("Seed completed successfully. Slots created:", slotsBatch.length);
 }
 
 main()
