@@ -1,11 +1,13 @@
 const { execSync } = require("child_process");
 
-if (process.env.MIGRATE_DATABASE_URL) {
-  process.env.DATABASE_URL = process.env.MIGRATE_DATABASE_URL;
-}
+// Run migrations using direct connection (POSTGRES_URL)
+const migrateUrl = process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL;
 
 try {
-  execSync("npx prisma migrate deploy --schema=./prisma/schema.prisma", { stdio: "inherit" });
+  execSync("npx prisma migrate deploy --schema=./prisma/schema.prisma", {
+    stdio: "inherit",
+    env: { ...process.env, POSTGRES_PRISMA_URL: migrateUrl },
+  });
 } catch (e) {
   console.error("Migration failed:", e.message);
   process.exit(1);
