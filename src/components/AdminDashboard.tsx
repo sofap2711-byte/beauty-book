@@ -39,13 +39,43 @@ const statusColors: Record<string, string> = {
   cancelled: "bg-red-100 text-red-600 border-red-200",
 };
 
+const periodLabels: Record<string, string> = {
+  today: "Сегодня",
+  week: "На этой неделе",
+  month: "В этом месяце",
+};
+
+function getMonday(d: Date): Date {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  date.setDate(diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function getSunday(d: Date): Date {
+  const monday = getMonday(d);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  return sunday;
+}
+
+function formatDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function AdminDashboard() {
   const [bookings, setBookings] = useState<BookingWithSlot[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterDate, setFilterDate] = useState<string>("all");
+  const [tableFilterDate, setTableFilterDate] = useState<string>("all");
   const [filterMaster, setFilterMaster] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
+
+  // Stat card period
+  const [statPeriod, setStatPeriod] = useState<string>("today");
+  const [statDropdownOpen, setStatDropdownOpen] = useState(false);
 
   // History modal
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -78,53 +108,89 @@ export default function AdminDashboard() {
     load();
   }, []);
 
-  const todayStr = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }, []);
+  const todayStr = useMemo(() => formatDateStr(new Date()), []);
   const tomorrowStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return formatDateStr(d);
   }, []);
-
   const weekEndStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return formatDateStr(d);
   }, []);
-
   const monthEndStr = useMemo(() => {
     const d = new Date();
     d.setMonth(d.getMonth() + 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return formatDateStr(d);
   }, []);
+
+  const stats = useMemo(() => {
+    const now = new Date();
+    const mondayStr = formatDateStr(getMonday(now));
+    const sundayStr = formatDateStr(getSunday(now));
+    const monthStartStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const monthEndStrFormatted = formatDateStr(monthEnd);
+
+    const todayCount = bookings.filter((b) => b.slot.date === todayStr).length;
+    const weekCount = bookings.filter(
+      (b) => b.slot.date >= mondayStr && b.slot.date <= sundayStr
+    ).length;
+    const monthCount = bookings.filter(
+      (b) => b.slot.date >= monthStartStr && b.slot.date <= monthEndStrFormatted
+    ).length;
+    const activeCount = bookings.filter(
+      (b) => b.status === "confirmed" || b.status === "completed"
+    ).length;
+    const newCount = bookings.filter((b) => b.status === "new").length;
+
+    return { todayCount, weekCount, monthCount, activeCount, newCount };
+  }, [bookings, todayStr]);
+
+  const statValue = useMemo(() => {
+    switch (statPeriod) {
+      case "today":
+        return stats.todayCount;
+      case "week":
+        return stats.weekCount;
+      case "month":
+        return stats.monthCount;
+      default:
+        return stats.todayCount;
+    }
+  }, [stats, statPeriod]);
 
   const filtered = useMemo(() => {
     return bookings.filter((b) => {
-      if (filterDate === "today" && b.slot.date !== todayStr) return false;
-      if (filterDate === "tomorrow" && b.slot.date !== tomorrowStr) return false;
-      if (filterDate === "week" && (b.slot.date < todayStr || b.slot.date > weekEndStr))
+      if (tableFilterDate === "today" && b.slot.date !== todayStr) return false;
+      if (tableFilterDate === "tomorrow" && b.slot.date !== tomorrowStr)
         return false;
-      if (filterDate === "month" && (b.slot.date < todayStr || b.slot.date > monthEndStr))
+      if (
+        tableFilterDate === "week" &&
+        (b.slot.date < todayStr || b.slot.date > weekEndStr)
+      )
         return false;
-      if (filterMaster !== "all" && b.slot.master.id !== filterMaster) return false;
+      if (
+        tableFilterDate === "month" &&
+        (b.slot.date < todayStr || b.slot.date > monthEndStr)
+      )
+        return false;
+      if (filterMaster !== "all" && b.slot.master.id !== filterMaster)
+        return false;
       if (filterStatus !== "all" && b.status !== filterStatus) return false;
       return true;
     });
-  }, [bookings, filterDate, filterMaster, filterStatus, todayStr, tomorrowStr, weekEndStr, monthEndStr]);
-
-  const stats = useMemo(() => {
-    const todayCount = bookings.filter((b) => b.slot.date === todayStr).length;
-    const weekCount = bookings.filter(
-      (b) => b.slot.date >= todayStr && b.slot.date <= weekEndStr
-    ).length;
-    const monthCount = bookings.filter(
-      (b) => b.slot.date >= todayStr && b.slot.date <= monthEndStr
-    ).length;
-    const newCount = bookings.filter((b) => b.status === "new").length;
-    return { todayCount, weekCount, monthCount, newCount };
-  }, [bookings, todayStr, weekEndStr, monthEndStr]);
+  }, [
+    bookings,
+    tableFilterDate,
+    filterMaster,
+    filterStatus,
+    todayStr,
+    tomorrowStr,
+    weekEndStr,
+    monthEndStr,
+  ]);
 
   const masters = useMemo(() => {
     const map = new Map<string, string>();
@@ -152,7 +218,11 @@ export default function AdminDashboard() {
     }
   };
 
-  const openHistory = async (phone: string, name: string, tg?: string | null) => {
+  const openHistory = async (
+    phone: string,
+    name: string,
+    tg?: string | null
+  ) => {
     setHistoryPhone(phone);
     setHistoryName(name);
     setHistoryTg(tg || "");
@@ -189,16 +259,18 @@ export default function AdminDashboard() {
     }
   };
 
-  const applyDateFilter = (value: string) => {
-    setFilterDate(value);
-    setDateDropdownOpen(false);
+  const applyStatPeriod = (value: string) => {
+    setStatPeriod(value);
+    setStatDropdownOpen(false);
   };
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-10">
         <div>
-          <h1 className="font-serif text-4xl text-slate-900 font-300">Записи салона</h1>
+          <h1 className="font-serif text-4xl text-slate-900 font-300">
+            Записи салона
+          </h1>
           <p className="text-slate-500 text-sm mt-1">Управление бронированиями</p>
         </div>
         <form action={logoutAdmin}>
@@ -214,45 +286,54 @@ export default function AdminDashboard() {
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
-        {/* Today — clickable with dropdown */}
+        {/* Period stat — clickable with dropdown */}
         <div className="relative">
           <button
-            onClick={() => setDateDropdownOpen(!dateDropdownOpen)}
+            onClick={() => setStatDropdownOpen(!statDropdownOpen)}
             className="w-full bg-white border border-slate-100 p-6 text-left hover:shadow-md transition-shadow"
           >
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Сегодня</div>
-                <div className="font-serif text-3xl text-slate-900">{stats.todayCount}</div>
+                <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">
+                  {periodLabels[statPeriod]}
+                </div>
+                <div className="font-serif text-3xl text-slate-900">
+                  {statValue}
+                </div>
               </div>
               <svg
-                className={`w-4 h-4 text-slate-400 transition-transform ${dateDropdownOpen ? "rotate-180" : ""}`}
+                className={`w-4 h-4 text-slate-400 transition-transform ${statDropdownOpen ? "rotate-180" : ""}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M19 9l-7 7-7-7"
+                />
               </svg>
             </div>
           </button>
 
-          {dateDropdownOpen && (
+          {statDropdownOpen && (
             <div className="absolute top-full left-0 right-0 z-10 bg-white border border-slate-100 shadow-lg mt-1">
               <button
-                onClick={() => applyDateFilter("today")}
-                className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${filterDate === "today" ? "text-slate-900 bg-slate-50" : "text-slate-600"}`}
+                onClick={() => applyStatPeriod("today")}
+                className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${statPeriod === "today" ? "text-slate-900 bg-slate-50" : "text-slate-600"}`}
               >
                 Сегодня
               </button>
               <button
-                onClick={() => applyDateFilter("week")}
-                className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${filterDate === "week" ? "text-slate-900 bg-slate-50" : "text-slate-600"}`}
+                onClick={() => applyStatPeriod("week")}
+                className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${statPeriod === "week" ? "text-slate-900 bg-slate-50" : "text-slate-600"}`}
               >
                 На этой неделе
               </button>
               <button
-                onClick={() => applyDateFilter("month")}
-                className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${filterDate === "month" ? "text-slate-900 bg-slate-50" : "text-slate-600"}`}
+                onClick={() => applyStatPeriod("month")}
+                className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${statPeriod === "month" ? "text-slate-900 bg-slate-50" : "text-slate-600"}`}
               >
                 В этом месяце
               </button>
@@ -261,19 +342,27 @@ export default function AdminDashboard() {
         </div>
 
         <div className="bg-white border border-slate-100 p-6">
-          <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Всего активных</div>
-          <div className="font-serif text-3xl text-slate-900">{bookings.length}</div>
+          <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">
+            Всего активных
+          </div>
+          <div className="font-serif text-3xl text-slate-900">
+            {stats.activeCount}
+          </div>
         </div>
         <div className="bg-white border border-slate-100 p-6">
-          <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Новые</div>
-          <div className="font-serif text-3xl text-amber-600">{stats.newCount}</div>
+          <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">
+            Новые
+          </div>
+          <div className="font-serif text-3xl text-amber-600">
+            {stats.newCount}
+          </div>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-3 mb-8">
         <select
-          value={filterDate}
-          onChange={(e) => setFilterDate(e.target.value)}
+          value={tableFilterDate}
+          onChange={(e) => setTableFilterDate(e.target.value)}
           className="rounded-none border border-slate-200 px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:border-sky-300"
         >
           <option value="all">Все даты</option>
@@ -337,32 +426,48 @@ export default function AdminDashboard() {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filtered.map((b) => (
-                <tr key={b.id} className="hover:bg-slate-50/50 transition-colors">
+                <tr
+                  key={b.id}
+                  className="hover:bg-slate-50/50 transition-colors"
+                >
                   <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
-                    {new Date(b.slot.date + "T00:00:00").toLocaleDateString("ru-RU")}
+                    {new Date(
+                      b.slot.date + "T00:00:00"
+                    ).toLocaleDateString("ru-RU")}
                   </td>
-                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{b.slot.time}</td>
-                  <td className="px-4 py-3 text-slate-900 whitespace-nowrap">{b.slot.master.name}</td>
+                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                    {b.slot.time}
+                  </td>
+                  <td className="px-4 py-3 text-slate-900 whitespace-nowrap">
+                    {b.slot.master.name}
+                  </td>
                   <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
                     {b.slot.master.service.name}
                   </td>
                   <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
                     <button
-                      onClick={() => openHistory(b.clientPhone, b.clientName, b.clientTg)}
+                      onClick={() =>
+                        openHistory(b.clientPhone, b.clientName, b.clientTg)
+                      }
                       className="hover:text-sky-600 hover:underline transition-colors cursor-pointer"
                     >
                       {b.clientName}
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{b.clientPhone}</td>
-                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{b.clientTg || "—"}</td>
+                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                    {b.clientPhone}
+                  </td>
+                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                    {b.clientTg || "—"}
+                  </td>
                   <td className="px-4 py-3 text-slate-500 max-w-xs truncate">
                     {b.comment || "—"}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span
                       className={`inline-flex items-center px-2 py-0.5 text-xs border ${
-                        statusColors[b.status] || "bg-slate-100 text-slate-500 border-slate-200"
+                        statusColors[b.status] ||
+                        "bg-slate-100 text-slate-500 border-slate-200"
                       }`}
                     >
                       {statusLabels[b.status] || b.status}
@@ -381,7 +486,9 @@ export default function AdminDashboard() {
                     <div className="flex items-center justify-end gap-1">
                       {b.status === "new" && (
                         <Button
-                          onClick={() => handleStatusChange(b.id, "confirmed")}
+                          onClick={() =>
+                            handleStatusChange(b.id, "confirmed")
+                          }
                           variant="outline"
                           size="sm"
                           className="rounded-none border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 transition-all text-xs"
@@ -391,7 +498,9 @@ export default function AdminDashboard() {
                       )}
                       {b.status === "confirmed" && (
                         <Button
-                          onClick={() => handleStatusChange(b.id, "completed")}
+                          onClick={() =>
+                            handleStatusChange(b.id, "completed")
+                          }
                           variant="outline"
                           size="sm"
                           className="rounded-none border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-700 hover:border-slate-300 transition-all text-xs"
@@ -468,17 +577,24 @@ export default function AdminDashboard() {
                     {historyData.map((h) => (
                       <tr key={h.id} className="hover:bg-slate-50/50">
                         <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
-                          {new Date(h.slot.date + "T00:00:00").toLocaleDateString("ru-RU")}
+                          {new Date(
+                            h.slot.date + "T00:00:00"
+                          ).toLocaleDateString("ru-RU")}
                         </td>
-                        <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{h.slot.time}</td>
-                        <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{h.slot.master.name}</td>
+                        <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
+                          {h.slot.time}
+                        </td>
+                        <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
+                          {h.slot.master.name}
+                        </td>
                         <td className="px-3 py-2 text-slate-500 whitespace-nowrap">
                           {h.slot.master.service.name}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           <span
                             className={`inline-flex items-center px-1.5 py-0.5 text-xs border ${
-                              statusColors[h.status] || "bg-slate-100 text-slate-500 border-slate-200"
+                              statusColors[h.status] ||
+                              "bg-slate-100 text-slate-500 border-slate-200"
                             }`}
                           >
                             {statusLabels[h.status] || h.status}
