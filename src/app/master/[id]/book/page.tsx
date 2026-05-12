@@ -97,7 +97,7 @@ export default function BookPage() {
         {selectedDate && (
           <div className="animate-fade-in-up">
             <h2 className="font-serif text-2xl text-slate-900 mb-6">
-              {new Date(selectedDate).toLocaleDateString("ru-RU", {
+              {new Date(selectedDate + "T00:00:00").toLocaleDateString("ru-RU", {
                 day: "numeric",
                 month: "long",
               })}

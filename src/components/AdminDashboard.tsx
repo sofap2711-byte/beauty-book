@@ -45,6 +45,7 @@ export default function AdminDashboard() {
   const [filterDate, setFilterDate] = useState<string>("all");
   const [filterMaster, setFilterMaster] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
 
   // History modal
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -77,17 +78,26 @@ export default function AdminDashboard() {
     load();
   }, []);
 
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, []);
   const tomorrowStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
-    return d.toISOString().split("T")[0];
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }, []);
 
   const weekEndStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
-    return d.toISOString().split("T")[0];
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, []);
+
+  const monthEndStr = useMemo(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }, []);
 
   const filtered = useMemo(() => {
@@ -96,20 +106,25 @@ export default function AdminDashboard() {
       if (filterDate === "tomorrow" && b.slot.date !== tomorrowStr) return false;
       if (filterDate === "week" && (b.slot.date < todayStr || b.slot.date > weekEndStr))
         return false;
+      if (filterDate === "month" && (b.slot.date < todayStr || b.slot.date > monthEndStr))
+        return false;
       if (filterMaster !== "all" && b.slot.master.id !== filterMaster) return false;
       if (filterStatus !== "all" && b.status !== filterStatus) return false;
       return true;
     });
-  }, [bookings, filterDate, filterMaster, filterStatus, todayStr, tomorrowStr, weekEndStr]);
+  }, [bookings, filterDate, filterMaster, filterStatus, todayStr, tomorrowStr, weekEndStr, monthEndStr]);
 
   const stats = useMemo(() => {
     const todayCount = bookings.filter((b) => b.slot.date === todayStr).length;
     const weekCount = bookings.filter(
       (b) => b.slot.date >= todayStr && b.slot.date <= weekEndStr
     ).length;
+    const monthCount = bookings.filter(
+      (b) => b.slot.date >= todayStr && b.slot.date <= monthEndStr
+    ).length;
     const newCount = bookings.filter((b) => b.status === "new").length;
-    return { todayCount, weekCount, newCount };
-  }, [bookings, todayStr, weekEndStr]);
+    return { todayCount, weekCount, monthCount, newCount };
+  }, [bookings, todayStr, weekEndStr, monthEndStr]);
 
   const masters = useMemo(() => {
     const map = new Map<string, string>();
@@ -174,6 +189,11 @@ export default function AdminDashboard() {
     }
   };
 
+  const applyDateFilter = (value: string) => {
+    setFilterDate(value);
+    setDateDropdownOpen(false);
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-10">
@@ -192,15 +212,54 @@ export default function AdminDashboard() {
         </form>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        <div className="bg-white border border-slate-100 p-6">
-          <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Сегодня</div>
-          <div className="font-serif text-3xl text-slate-900">{stats.todayCount}</div>
+      {/* Stats cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+        {/* Today — clickable with dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setDateDropdownOpen(!dateDropdownOpen)}
+            className="w-full bg-white border border-slate-100 p-6 text-left hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Сегодня</div>
+                <div className="font-serif text-3xl text-slate-900">{stats.todayCount}</div>
+              </div>
+              <svg
+                className={`w-4 h-4 text-slate-400 transition-transform ${dateDropdownOpen ? "rotate-180" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </button>
+
+          {dateDropdownOpen && (
+            <div className="absolute top-full left-0 right-0 z-10 bg-white border border-slate-100 shadow-lg mt-1">
+              <button
+                onClick={() => applyDateFilter("today")}
+                className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${filterDate === "today" ? "text-slate-900 bg-slate-50" : "text-slate-600"}`}
+              >
+                Сегодня
+              </button>
+              <button
+                onClick={() => applyDateFilter("week")}
+                className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${filterDate === "week" ? "text-slate-900 bg-slate-50" : "text-slate-600"}`}
+              >
+                На этой неделе
+              </button>
+              <button
+                onClick={() => applyDateFilter("month")}
+                className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${filterDate === "month" ? "text-slate-900 bg-slate-50" : "text-slate-600"}`}
+              >
+                В этом месяце
+              </button>
+            </div>
+          )}
         </div>
-        <div className="bg-white border border-slate-100 p-6">
-          <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">На этой неделе</div>
-          <div className="font-serif text-3xl text-slate-900">{stats.weekCount}</div>
-        </div>
+
         <div className="bg-white border border-slate-100 p-6">
           <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Всего активных</div>
           <div className="font-serif text-3xl text-slate-900">{bookings.length}</div>
@@ -221,6 +280,7 @@ export default function AdminDashboard() {
           <option value="today">Сегодня</option>
           <option value="tomorrow">Завтра</option>
           <option value="week">Неделя</option>
+          <option value="month">Месяц</option>
         </select>
         <select
           value={filterMaster}
@@ -279,7 +339,7 @@ export default function AdminDashboard() {
               {filtered.map((b) => (
                 <tr key={b.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
-                    {new Date(b.slot.date).toLocaleDateString("ru-RU")}
+                    {new Date(b.slot.date + "T00:00:00").toLocaleDateString("ru-RU")}
                   </td>
                   <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{b.slot.time}</td>
                   <td className="px-4 py-3 text-slate-900 whitespace-nowrap">{b.slot.master.name}</td>
@@ -408,7 +468,7 @@ export default function AdminDashboard() {
                     {historyData.map((h) => (
                       <tr key={h.id} className="hover:bg-slate-50/50">
                         <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
-                          {new Date(h.slot.date).toLocaleDateString("ru-RU")}
+                          {new Date(h.slot.date + "T00:00:00").toLocaleDateString("ru-RU")}
                         </td>
                         <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{h.slot.time}</td>
                         <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{h.slot.master.name}</td>

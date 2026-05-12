@@ -15,11 +15,33 @@ const monthNames = [
   "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
 ];
 
+function formatDateLocal(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 export default function Calendar({ onSelectDate, selectedDate }: CalendarProps) {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
+
+  // Max date: 2 months from today (e.g. today is May 12 → max is July 12)
+  const maxDate = new Date(today);
+  maxDate.setMonth(maxDate.getMonth() + 2);
+
+  // Min navigation: current month
+  const minNavDate = new Date(today.getFullYear(), today.getMonth(), 1);
+  // Max navigation: month of maxDate
+  const maxNavDate = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
+
+  const canGoPrev = currentDate > minNavDate;
+  const canGoNext = currentDate < maxNavDate;
 
   const days = useMemo(() => {
     const firstDayOfMonth = new Date(year, month, 1);
@@ -33,35 +55,41 @@ export default function Calendar({ onSelectDate, selectedDate }: CalendarProps) 
       dateStr: string;
       isWeekend: boolean;
       isToday: boolean;
+      isPast: boolean;
+      isBeyondMax: boolean;
     }[] = [];
 
     for (let i = 0; i < startDay; i++) {
-      result.push({ day: 0, dateStr: "", isWeekend: false, isToday: false });
+      result.push({ day: 0, dateStr: "", isWeekend: false, isToday: false, isPast: false, isBeyondMax: false });
     }
 
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = formatDateLocal(today);
 
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(year, month, d);
       const dayOfWeek = date.getDay();
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-      const dateStr = date.toISOString().split("T")[0];
+      const dateStr = formatDateLocal(date);
       result.push({
         day: d,
         dateStr,
         isWeekend,
         isToday: dateStr === todayStr,
+        isPast: date < today,
+        isBeyondMax: date > maxDate,
       });
     }
 
     return result;
-  }, [year, month]);
+  }, [year, month, today, maxDate]);
 
   const prevMonth = () => {
+    if (!canGoPrev) return;
     setCurrentDate(new Date(year, month - 1, 1));
   };
 
   const nextMonth = () => {
+    if (!canGoNext) return;
     setCurrentDate(new Date(year, month + 1, 1));
   };
 
@@ -72,7 +100,8 @@ export default function Calendar({ onSelectDate, selectedDate }: CalendarProps) 
           variant="ghost"
           size="icon"
           onClick={prevMonth}
-          className="rounded-none text-slate-400 hover:text-slate-900 hover:bg-slate-100"
+          disabled={!canGoPrev}
+          className="rounded-none text-slate-400 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <ChevronLeft className="w-5 h-5" />
         </Button>
@@ -83,7 +112,8 @@ export default function Calendar({ onSelectDate, selectedDate }: CalendarProps) 
           variant="ghost"
           size="icon"
           onClick={nextMonth}
-          className="rounded-none text-slate-400 hover:text-slate-900 hover:bg-slate-100"
+          disabled={!canGoNext}
+          className="rounded-none text-slate-400 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <ChevronRight className="w-5 h-5" />
         </Button>
@@ -107,12 +137,17 @@ export default function Calendar({ onSelectDate, selectedDate }: CalendarProps) 
           }
 
           const isSelected = selectedDate === item.dateStr;
+          const isDisabled = item.isWeekend || item.isPast || item.isBeyondMax;
 
-          if (item.isWeekend) {
+          if (isDisabled) {
             return (
               <div
                 key={idx}
-                className="aspect-square flex items-center justify-center text-sm text-slate-300 bg-slate-50/50"
+                className={`aspect-square flex items-center justify-center text-sm ${
+                  item.isWeekend
+                    ? "text-slate-300 bg-slate-50/50"
+                    : "text-slate-300 bg-slate-50/30"
+                }`}
               >
                 {item.day}
               </div>

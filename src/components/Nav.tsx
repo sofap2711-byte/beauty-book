@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { Menu, X } from "lucide-react";
 
 function scrollToSection(id: string) {
@@ -13,10 +14,17 @@ function scrollToSection(id: string) {
 
 export default function Nav() {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+  const isHome = pathname === "/";
 
   const handleLink = (id: string) => {
     setOpen(false);
-    setTimeout(() => scrollToSection(id), 100);
+    if (isHome) {
+      setTimeout(() => scrollToSection(id), 100);
+    } else {
+      router.push(`/#${id}`);
+    }
   };
 
   return (
@@ -28,20 +36,20 @@ export default function Nav() {
 
         <div className="hidden md:flex items-center gap-8">
           <button
-            onClick={() => scrollToSection("about")}
+            onClick={() => handleLink("about")}
             className="text-sm text-slate-600 hover:text-slate-900 transition-colors tracking-wide"
           >
             О салоне
           </button>
           <button
-            onClick={() => scrollToSection("services")}
+            onClick={() => handleLink("services")}
             className="text-sm text-slate-600 hover:text-slate-900 transition-colors tracking-wide"
           >
             Услуги
           </button>
 
           <button
-            onClick={() => scrollToSection("services")}
+            onClick={() => handleLink("services")}
             className="text-sm px-5 py-2 bg-slate-900 text-white hover:bg-slate-800 transition-colors tracking-wide"
           >
             Записаться
