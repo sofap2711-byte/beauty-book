@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
+  await prisma.booking.deleteMany();
   await prisma.slot.deleteMany();
   await prisma.master.deleteMany();
   await prisma.subService.deleteMany();
@@ -194,7 +195,29 @@ async function main() {
     });
   }
 
-  console.log("Seed completed successfully. Slots created:", slotsBatch.length);
+  // Create Booking records for all booked demo slots
+  const bookedSlots = await prisma.slot.findMany({
+    where: { status: "booked" },
+    select: { id: true, clientName: true, clientPhone: true, clientTg: true, comment: true },
+  });
+
+  const bookingsBatch = bookedSlots.map((slot) => ({
+    slotId: slot.id,
+    clientName: slot.clientName || "Демо-клиент",
+    clientPhone: slot.clientPhone || "+79991234567",
+    clientTg: slot.clientTg,
+    comment: slot.comment,
+    status: "new",
+  }));
+
+  for (let i = 0; i < bookingsBatch.length; i += batchSize) {
+    await prisma.booking.createMany({
+      data: bookingsBatch.slice(i, i + batchSize),
+      skipDuplicates: true,
+    });
+  }
+
+  console.log("Seed completed successfully. Slots created:", slotsBatch.length, "Bookings created:", bookingsBatch.length);
 }
 
 main()

@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("POSTGRES_PRISMA_URL")
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL")
 }
 
 model Service {
@@ -54,8 +55,23 @@ model Slot {
   clientPhone String?
   clientTg    String?
   comment     String?
+  booking     Booking?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@unique([masterId, date, time])
+}
+
+model Booking {
+  id          String   @id @default(uuid())
+  slotId      String   @unique
+  slot        Slot     @relation(fields: [slotId], references: [id])
+  clientName  String
+  clientPhone String
+  clientTg    String?
+  comment     String?
+  status      String   @default("new")
+  adminNotes  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

@@ -1,28 +1,76 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { getBookings, cancelBooking } from "@/app/actions";
+import {
+  getBookings,
+  cancelBooking,
+  updateBookingStatus,
+  updateAdminNotes,
+  getClientHistory,
+} from "@/app/actions";
 import { logoutAdmin } from "@/app/admin/actions";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
-import type { Slot, Master, Service } from "@prisma/client";
+import type { Booking, Slot, Master, Service } from "@prisma/client";
 
-type BookingWithMaster = Slot & {
-  master: Master & { service: Service };
+type BookingWithSlot = Booking & {
+  slot: Slot & {
+    master: Master & { service: Service };
+  };
+};
+
+const statusLabels: Record<string, string> = {
+  new: "Новая",
+  confirmed: "Подтверждена",
+  completed: "Завершена",
+  cancelled: "Отменена",
+};
+
+const statusColors: Record<string, string> = {
+  new: "bg-amber-100 text-amber-700 border-amber-200",
+  confirmed: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  completed: "bg-slate-100 text-slate-500 border-slate-200",
+  cancelled: "bg-red-100 text-red-600 border-red-200",
 };
 
 export default function AdminDashboard() {
-  const [bookings, setBookings] = useState<BookingWithMaster[]>([]);
+  const [bookings, setBookings] = useState<BookingWithSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterDate, setFilterDate] = useState<string>("all");
   const [filterMaster, setFilterMaster] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+
+  // History modal
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyPhone, setHistoryPhone] = useState("");
+  const [historyName, setHistoryName] = useState("");
+  const [historyTg, setHistoryTg] = useState("");
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyData, setHistoryData] = useState<BookingWithSlot[]>([]);
+
+  // Notes modal
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesBookingId, setNotesBookingId] = useState("");
+  const [notesValue, setNotesValue] = useState("");
+  const [notesSaving, setNotesSaving] = useState(false);
 
   const load = () => {
     setLoading(true);
-    getBookings().then((data) => {
-      setBookings(data as BookingWithMaster[]);
-      setLoading(false);
-    });
+    getBookings()
+      .then((data) => {
+        setBookings(data as BookingWithSlot[]);
+        setLoading(false);
+      })
+      .catch(() => {
+        toast.error("Ошибка загрузки записей");
+        setLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -44,35 +92,85 @@ export default function AdminDashboard() {
 
   const filtered = useMemo(() => {
     return bookings.filter((b) => {
-      if (filterDate === "today" && b.date !== todayStr) return false;
-      if (filterDate === "tomorrow" && b.date !== tomorrowStr) return false;
-      if (filterDate === "week" && (b.date < todayStr || b.date > weekEndStr)) return false;
-      if (filterMaster !== "all" && b.master.id !== filterMaster) return false;
+      if (filterDate === "today" && b.slot.date !== todayStr) return false;
+      if (filterDate === "tomorrow" && b.slot.date !== tomorrowStr) return false;
+      if (filterDate === "week" && (b.slot.date < todayStr || b.slot.date > weekEndStr))
+        return false;
+      if (filterMaster !== "all" && b.slot.master.id !== filterMaster) return false;
+      if (filterStatus !== "all" && b.status !== filterStatus) return false;
       return true;
     });
-  }, [bookings, filterDate, filterMaster, todayStr, tomorrowStr, weekEndStr]);
+  }, [bookings, filterDate, filterMaster, filterStatus, todayStr, tomorrowStr, weekEndStr]);
 
   const stats = useMemo(() => {
-    const todayCount = bookings.filter((b) => b.date === todayStr).length;
+    const todayCount = bookings.filter((b) => b.slot.date === todayStr).length;
     const weekCount = bookings.filter(
-      (b) => b.date >= todayStr && b.date <= weekEndStr
+      (b) => b.slot.date >= todayStr && b.slot.date <= weekEndStr
     ).length;
-    return { todayCount, weekCount };
+    const newCount = bookings.filter((b) => b.status === "new").length;
+    return { todayCount, weekCount, newCount };
   }, [bookings, todayStr, weekEndStr]);
 
   const masters = useMemo(() => {
     const map = new Map<string, string>();
-    bookings.forEach((b) => map.set(b.master.id, b.master.name));
+    bookings.forEach((b) => map.set(b.slot.master.id, b.slot.master.name));
     return Array.from(map.entries());
   }, [bookings]);
 
-  const handleCancel = async (slotId: string) => {
+  const handleCancel = async (bookingId: string, slotId: string) => {
     try {
       await cancelBooking(slotId);
       toast.success("Запись отменена");
       load();
     } catch {
       toast.error("Ошибка при отмене");
+    }
+  };
+
+  const handleStatusChange = async (bookingId: string, status: string) => {
+    try {
+      await updateBookingStatus(bookingId, status);
+      toast.success("Статус обновлён");
+      load();
+    } catch {
+      toast.error("Ошибка при обновлении статуса");
+    }
+  };
+
+  const openHistory = async (phone: string, name: string, tg?: string | null) => {
+    setHistoryPhone(phone);
+    setHistoryName(name);
+    setHistoryTg(tg || "");
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+    try {
+      const data = await getClientHistory(phone);
+      setHistoryData(data as BookingWithSlot[]);
+    } catch {
+      toast.error("Ошибка загрузки истории");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const openNotes = (bookingId: string, currentNotes?: string | null) => {
+    setNotesBookingId(bookingId);
+    setNotesValue(currentNotes || "");
+    setNotesOpen(true);
+  };
+
+  const saveNotes = async () => {
+    if (!notesBookingId) return;
+    setNotesSaving(true);
+    try {
+      await updateAdminNotes(notesBookingId, notesValue);
+      toast.success("Заметки сохранены");
+      setNotesOpen(false);
+      load();
+    } catch {
+      toast.error("Ошибка при сохранении заметок");
+    } finally {
+      setNotesSaving(false);
     }
   };
 
@@ -94,7 +192,7 @@ export default function AdminDashboard() {
         </form>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         <div className="bg-white border border-slate-100 p-6">
           <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Сегодня</div>
           <div className="font-serif text-3xl text-slate-900">{stats.todayCount}</div>
@@ -106,6 +204,10 @@ export default function AdminDashboard() {
         <div className="bg-white border border-slate-100 p-6">
           <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Всего активных</div>
           <div className="font-serif text-3xl text-slate-900">{bookings.length}</div>
+        </div>
+        <div className="bg-white border border-slate-100 p-6">
+          <div className="text-xs uppercase tracking-wider text-slate-400 mb-2">Новые</div>
+          <div className="font-serif text-3xl text-amber-600">{stats.newCount}</div>
         </div>
       </div>
 
@@ -131,6 +233,16 @@ export default function AdminDashboard() {
               {name}
             </option>
           ))}
+        </select>
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="rounded-none border border-slate-200 px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:border-sky-300"
+        >
+          <option value="all">Все статусы</option>
+          <option value="new">Новая</option>
+          <option value="confirmed">Подтверждена</option>
+          <option value="completed">Завершена</option>
         </select>
         <Button
           onClick={load}
@@ -158,6 +270,8 @@ export default function AdminDashboard() {
                 <th className="px-4 py-3 font-normal">Телефон</th>
                 <th className="px-4 py-3 font-normal">Telegram</th>
                 <th className="px-4 py-3 font-normal">Комментарий</th>
+                <th className="px-4 py-3 font-normal">Статус</th>
+                <th className="px-4 py-3 font-normal">Заметки</th>
                 <th className="px-4 py-3 font-normal text-right">Действия</th>
               </tr>
             </thead>
@@ -165,28 +279,77 @@ export default function AdminDashboard() {
               {filtered.map((b) => (
                 <tr key={b.id} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
-                    {new Date(b.date).toLocaleDateString("ru-RU")}
+                    {new Date(b.slot.date).toLocaleDateString("ru-RU")}
                   </td>
-                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{b.time}</td>
-                  <td className="px-4 py-3 text-slate-900 whitespace-nowrap">{b.master.name}</td>
+                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{b.slot.time}</td>
+                  <td className="px-4 py-3 text-slate-900 whitespace-nowrap">{b.slot.master.name}</td>
                   <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                    {b.master.service.name}
+                    {b.slot.master.service.name}
                   </td>
-                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">{b.clientName}</td>
+                  <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+                    <button
+                      onClick={() => openHistory(b.clientPhone, b.clientName, b.clientTg)}
+                      className="hover:text-sky-600 hover:underline transition-colors cursor-pointer"
+                    >
+                      {b.clientName}
+                    </button>
+                  </td>
                   <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{b.clientPhone}</td>
                   <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{b.clientTg || "—"}</td>
                   <td className="px-4 py-3 text-slate-500 max-w-xs truncate">
                     {b.comment || "—"}
                   </td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap">
-                    <Button
-                      onClick={() => handleCancel(b.id)}
-                      variant="outline"
-                      size="sm"
-                      className="rounded-none border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition-all text-xs"
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 text-xs border ${
+                        statusColors[b.status] || "bg-slate-100 text-slate-500 border-slate-200"
+                      }`}
                     >
-                      Отменить
-                    </Button>
+                      {statusLabels[b.status] || b.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <button
+                      onClick={() => openNotes(b.id, b.adminNotes)}
+                      className="text-slate-400 hover:text-sky-500 transition-colors"
+                      title="Заметки админа"
+                    >
+                      {b.adminNotes ? "💬" : "📝"}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-1">
+                      {b.status === "new" && (
+                        <Button
+                          onClick={() => handleStatusChange(b.id, "confirmed")}
+                          variant="outline"
+                          size="sm"
+                          className="rounded-none border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 transition-all text-xs"
+                        >
+                          Подтвердить
+                        </Button>
+                      )}
+                      {b.status === "confirmed" && (
+                        <Button
+                          onClick={() => handleStatusChange(b.id, "completed")}
+                          variant="outline"
+                          size="sm"
+                          className="rounded-none border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-700 hover:border-slate-300 transition-all text-xs"
+                        >
+                          Клиент пришёл
+                        </Button>
+                      )}
+                      {b.status !== "completed" && b.status !== "cancelled" && (
+                        <Button
+                          onClick={() => handleCancel(b.id, b.slotId)}
+                          variant="outline"
+                          size="sm"
+                          className="rounded-none border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition-all text-xs"
+                        >
+                          Отменить
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -194,6 +357,128 @@ export default function AdminDashboard() {
           </table>
         </div>
       )}
+
+      {/* History Modal */}
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="rounded-none bg-white border border-slate-200 shadow-2xl max-w-lg w-full">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-slate-900 text-2xl font-300">
+              История клиента
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 space-y-4">
+            <div className="bg-slate-50 border border-slate-100 px-4 py-3 text-sm">
+              <p>
+                <span className="text-slate-400">Имя:</span>{" "}
+                <span className="text-slate-900">{historyName}</span>
+              </p>
+              <p className="mt-1">
+                <span className="text-slate-400">Телефон:</span>{" "}
+                <span className="text-slate-900">{historyPhone}</span>
+              </p>
+              {historyTg && (
+                <p className="mt-1">
+                  <span className="text-slate-400">Telegram:</span>{" "}
+                  <span className="text-slate-900">{historyTg}</span>
+                </p>
+              )}
+              <p className="mt-1">
+                <span className="text-slate-400">Всего визитов:</span>{" "}
+                <span className="text-slate-900">{historyData.length}</span>
+              </p>
+            </div>
+
+            {historyLoading ? (
+              <p className="text-sm text-slate-400">Загрузка...</p>
+            ) : historyData.length === 0 ? (
+              <p className="text-sm text-slate-400">Нет записей</p>
+            ) : (
+              <div className="max-h-64 overflow-y-auto border border-slate-100">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400 bg-white">
+                      <th className="px-3 py-2 font-normal">Дата</th>
+                      <th className="px-3 py-2 font-normal">Время</th>
+                      <th className="px-3 py-2 font-normal">Мастер</th>
+                      <th className="px-3 py-2 font-normal">Услуга</th>
+                      <th className="px-3 py-2 font-normal">Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {historyData.map((h) => (
+                      <tr key={h.id} className="hover:bg-slate-50/50">
+                        <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
+                          {new Date(h.slot.date).toLocaleDateString("ru-RU")}
+                        </td>
+                        <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{h.slot.time}</td>
+                        <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{h.slot.master.name}</td>
+                        <td className="px-3 py-2 text-slate-500 whitespace-nowrap">
+                          {h.slot.master.service.name}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center px-1.5 py-0.5 text-xs border ${
+                              statusColors[h.status] || "bg-slate-100 text-slate-500 border-slate-200"
+                            }`}
+                          >
+                            {statusLabels[h.status] || h.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button
+                onClick={() => setHistoryOpen(false)}
+                variant="outline"
+                className="rounded-none border-slate-300 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all text-sm"
+              >
+                Закрыть
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Notes Modal */}
+      <Dialog open={notesOpen} onOpenChange={setNotesOpen}>
+        <DialogContent className="rounded-none bg-white border border-slate-200 shadow-2xl max-w-sm w-full">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-slate-900 text-2xl font-300">
+              Заметки админа
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 space-y-4">
+            <textarea
+              value={notesValue}
+              onChange={(e) => setNotesValue(e.target.value)}
+              placeholder="Введите заметки..."
+              rows={4}
+              className="w-full rounded-none border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-sky-300 focus:ring-1 focus:ring-sky-200 transition-colors resize-none"
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                onClick={() => setNotesOpen(false)}
+                variant="outline"
+                className="rounded-none border-slate-300 text-slate-700 hover:bg-slate-100 hover:border-slate-400 transition-all text-sm"
+              >
+                Отмена
+              </Button>
+              <Button
+                onClick={saveNotes}
+                disabled={notesSaving}
+                className="rounded-none bg-slate-900 hover:bg-slate-800 text-white transition-all text-sm"
+              >
+                {notesSaving ? "Сохранение..." : "Сохранить"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
