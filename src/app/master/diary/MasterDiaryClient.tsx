@@ -839,6 +839,28 @@ function AddEditModal({
               Отмена
             </button>
           </div>
+
+          {/* Delete blocked time */}
+          {isEdit && isBlocked && block && (
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!confirm(`Удалить блокировку ${block.startTime}–${block.endTime}? Время станет свободным для записи.`)) return;
+                  try {
+                    await deleteTimeBlock(block.id);
+                    toast.success("Блокировка удалена. Время свободно.");
+                    onSuccess();
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Ошибка удаления");
+                  }
+                }}
+                className="w-full py-3 bg-red-50 border border-red-200 text-red-600 text-sm tracking-wide hover:bg-red-100 transition-colors"
+              >
+                🗑 Удалить блокировку
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </div>
