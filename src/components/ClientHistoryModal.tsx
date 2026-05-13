@@ -47,9 +47,9 @@ export default function ClientHistoryModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-none bg-white border border-slate-200 shadow-2xl w-[92vw] max-w-[800px] max-h-[85vh] overflow-hidden p-0">
+      <DialogContent showCloseButton={false} className="rounded-none bg-white border border-slate-200 shadow-2xl w-[95vw] sm:max-w-[900px] max-h-[90vh] overflow-hidden p-0 flex flex-col">
         {/* Header */}
-        <DialogHeader className="px-5 pt-5 pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
+        <DialogHeader className="px-5 pt-5 pb-3 border-b border-slate-100 flex flex-row items-center justify-between flex-shrink-0">
           <DialogTitle className="font-serif text-xl font-300 text-slate-900">
             История клиента
           </DialogTitle>
@@ -61,9 +61,9 @@ export default function ClientHistoryModal({
           </button>
         </DialogHeader>
 
-        <div className="px-5 py-4 space-y-4 overflow-y-auto">
+        <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1 min-h-0">
           {/* Client info */}
-          <div className="bg-slate-50 border border-slate-100 px-4 py-3 text-sm">
+          <div className="bg-slate-50 border border-slate-100 px-4 py-3 text-sm flex-shrink-0">
             <p>
               <span className="text-slate-400">Имя:</span>{" "}
               <span className="text-slate-900">{name || "—"}</span>
@@ -90,17 +90,19 @@ export default function ClientHistoryModal({
           ) : data.length === 0 ? (
             <p className="text-sm text-slate-400">Нет записей</p>
           ) : (
-            <div>
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto -mx-5 px-5">
+              <table className="w-full text-sm min-w-[520px]">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-[11px] uppercase tracking-wider text-slate-400">
-                    <th className="py-2 px-3 font-normal">Дата</th>
-                    <th className="py-2 px-3 font-normal">Мастер</th>
-                    <th className="py-2 px-3 font-normal">Услуга</th>
-                    <th className="py-2 px-3 font-normal text-center">
+                    <th className="py-2 px-1 font-normal w-[90px]">Дата</th>
+                    <th className="py-2 px-1 font-normal w-[110px]">Мастер</th>
+                    <th className="py-2 px-1 font-normal">Услуга</th>
+                    <th className="py-2 px-1 font-normal text-center w-[70px]">
+                      <span className="sr-only">Цена</span>
                       <Banknote className="w-4 h-4 inline-block" strokeWidth={1.5} />
                     </th>
-                    <th className="py-2 px-3 font-normal text-center">
+                    <th className="py-2 px-1 font-normal text-center w-[40px]">
+                      <span className="sr-only">Комментарий</span>
                       <FileText className="w-4 h-4 inline-block" strokeWidth={1.5} />
                     </th>
                   </tr>
@@ -108,19 +110,19 @@ export default function ClientHistoryModal({
                 <tbody className="divide-y divide-slate-50">
                   {data.map((h) => (
                     <tr key={h.id} className="hover:bg-slate-50/50">
-                      <td className="py-2 px-3 text-slate-700 whitespace-nowrap">
+                      <td className="py-1.5 px-1 text-slate-700 whitespace-nowrap">
                         {new Date(h.date).toLocaleDateString("ru-RU")}
                       </td>
-                      <td className="py-2 px-3 text-slate-700 whitespace-nowrap">
+                      <td className="py-1.5 px-1 text-slate-700 whitespace-nowrap">
                         {h.master.name}
                       </td>
-                      <td className="py-2 px-3 text-slate-500 whitespace-nowrap">
+                      <td className="py-1.5 px-1 text-slate-500 max-w-[200px] truncate">
                         {h.serviceName || h.master.service.name}
                       </td>
-                      <td className="py-2 px-3 text-center whitespace-nowrap text-slate-700">
+                      <td className="py-1.5 px-1 text-center whitespace-nowrap text-slate-700">
                         {h.price ? `${h.price.toLocaleString("ru-RU")} ₽` : "—"}
                       </td>
-                      <td className="py-2 px-3 text-center whitespace-nowrap">
+                      <td className="py-1.5 px-1 text-center whitespace-nowrap">
                         <span
                           title={h.comment || undefined}
                           className="inline-flex items-center justify-center"
