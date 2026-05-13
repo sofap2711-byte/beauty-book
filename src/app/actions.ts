@@ -169,11 +169,12 @@ export async function updateAdminNotes(blockId: string, notes: string) {
   return updated;
 }
 
-export async function getClientHistory(clientPhone: string) {
+export async function getClientHistory(clientPhone: string, masterId?: string) {
   return prisma.timeBlock.findMany({
     where: {
       clientPhone,
       type: "booking",
+      ...(masterId ? { masterId } : {}),
     },
     include: {
       master: { include: { service: true } },

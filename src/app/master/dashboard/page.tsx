@@ -21,6 +21,7 @@ export default async function MasterDashboardPage({
     <MasterLayout masterName={master.name}>
       <MasterDashboardClient
         masterName={master.name}
+        masterId={master.id}
         stats={stats}
         bookings={bookings}
         filter={filter}

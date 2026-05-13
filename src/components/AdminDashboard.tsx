@@ -8,7 +8,6 @@ import {
   cancelBooking,
   updateBookingStatus,
   updateAdminNotes,
-  getClientHistory,
 } from "@/app/actions";
 import { logoutAdmin } from "@/app/admin/actions";
 import { Button } from "@/components/ui/button";
@@ -20,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import type { TimeBlock, Master, Service } from "@prisma/client";
+import ClientHistoryModal from "@/components/ClientHistoryModal";
 
 type BlockWithMaster = TimeBlock & {
   master: Master & { service: Service };
@@ -85,8 +85,6 @@ export default function AdminDashboard() {
   const [historyPhone, setHistoryPhone] = useState("");
   const [historyName, setHistoryName] = useState("");
   const [historyTg, setHistoryTg] = useState("");
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyData, setHistoryData] = useState<BlockWithMaster[]>([]);
 
   // Notes modal
   const [notesOpen, setNotesOpen] = useState(false);
@@ -212,7 +210,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const openHistory = async (
+  const openHistory = (
     phone: string,
     name: string,
     tg?: string | null
@@ -221,15 +219,6 @@ export default function AdminDashboard() {
     setHistoryName(name);
     setHistoryTg(tg || "");
     setHistoryOpen(true);
-    setHistoryLoading(true);
-    try {
-      const data = await getClientHistory(phone);
-      setHistoryData(data as BlockWithMaster[]);
-    } catch {
-      toast.error("Ошибка загрузки истории");
-    } finally {
-      setHistoryLoading(false);
-    }
   };
 
   const openNotes = (blockId: string, currentNotes?: string | null) => {
@@ -517,96 +506,13 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* History Modal */}
-      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
-        <DialogContent className="rounded-none bg-white border border-slate-200 shadow-2xl max-w-lg w-full">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-slate-900 text-2xl font-300">
-              История клиента
-            </DialogTitle>
-          </DialogHeader>
-          <div className="mt-4 space-y-4">
-            <div className="bg-slate-50 border border-slate-100 px-4 py-3 text-sm">
-              <p>
-                <span className="text-slate-400">Имя:</span>{" "}
-                <span className="text-slate-900">{historyName}</span>
-              </p>
-              <p className="mt-1">
-                <span className="text-slate-400">Телефон:</span>{" "}
-                <span className="text-slate-900">{historyPhone}</span>
-              </p>
-              {historyTg && (
-                <p className="mt-1">
-                  <span className="text-slate-400">Telegram:</span>{" "}
-                  <span className="text-slate-900">{historyTg}</span>
-                </p>
-              )}
-              <p className="mt-1">
-                <span className="text-slate-400">Всего визитов:</span>{" "}
-                <span className="text-slate-900">{historyData.length}</span>
-              </p>
-            </div>
-
-            {historyLoading ? (
-              <p className="text-sm text-slate-400">Загрузка...</p>
-            ) : historyData.length === 0 ? (
-              <p className="text-sm text-slate-400">Нет записей</p>
-            ) : (
-              <div className="max-h-64 overflow-y-auto border border-slate-100">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400 bg-white">
-                      <th className="px-3 py-2 font-normal">Дата</th>
-                      <th className="px-3 py-2 font-normal">Время</th>
-                      <th className="px-3 py-2 font-normal">Мастер</th>
-                      <th className="px-3 py-2 font-normal">Услуга</th>
-                      <th className="px-3 py-2 font-normal">Статус</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {historyData.map((h) => (
-                      <tr key={h.id} className="hover:bg-slate-50/50">
-                        <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
-                          {new Date(h.date).toLocaleDateString("ru-RU")}
-                        </td>
-                        <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
-                          {h.startTime} – {h.endTime}
-                        </td>
-                        <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
-                          {h.master.name}
-                        </td>
-                        <td className="px-3 py-2 text-slate-500 whitespace-nowrap">
-                          {h.serviceName || h.master.service.name}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center px-1.5 py-0.5 text-xs border ${
-                              statusColors[h.status] ||
-                              "bg-slate-100 text-slate-500 border-slate-200"
-                            }`}
-                          >
-                            {statusLabels[h.status] || h.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            <div className="flex justify-end">
-              <Button
-                onClick={() => setHistoryOpen(false)}
-                variant="outline"
-                className="rounded-none border-slate-300 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all text-sm"
-              >
-                Закрыть
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ClientHistoryModal
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        phone={historyPhone}
+        name={historyName}
+        tg={historyTg}
+      />
 
       {/* Notes Modal */}
       <Dialog open={notesOpen} onOpenChange={setNotesOpen}>
