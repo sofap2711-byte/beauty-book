@@ -95,7 +95,7 @@ export async function getMasterStats(masterId: string) {
   const weekLater = new Date(today);
   weekLater.setDate(today.getDate() + 7);
 
-  const [todayCount, tomorrowCount, weekCount, totalCount] = await Promise.all([
+  const [todayCount, tomorrowCount, weekCount, totalCount, revenueAgg] = await Promise.all([
     prisma.timeBlock.count({
       where: { masterId, type: "booking", date: today, status: { not: "cancelled" } },
     }),
@@ -108,12 +108,26 @@ export async function getMasterStats(masterId: string) {
     prisma.timeBlock.count({
       where: { masterId, type: "booking", status: "confirmed" },
     }),
+    prisma.timeBlock.aggregate({
+      where: {
+        masterId,
+        type: "booking",
+        status: { in: ["confirmed", "completed"] },
+      },
+      _sum: { price: true },
+    }),
   ]);
 
-  return { today: todayCount, tomorrow: tomorrowCount, week: weekCount, total: totalCount };
+  return {
+    today: todayCount,
+    tomorrow: tomorrowCount,
+    week: weekCount,
+    total: totalCount,
+    revenue: revenueAgg._sum.price || 0,
+  };
 }
 
-export async function updateMasterSchedule(
+export async function updateMasterDefaultSchedule(
   masterId: string,
   data: {
     workDays: string;
@@ -132,6 +146,95 @@ export async function updateMasterSchedule(
 
   revalidatePath("/master/schedule");
   return updated;
+}
+
+// ===== MasterSchedule Actions =====
+
+export async function getMasterYearSchedule(masterId: string, year: number) {
+  const start = new Date(year, 0, 1);
+  const end = new Date(year, 11, 31);
+
+  const schedules = await prisma.masterSchedule.findMany({
+    where: { masterId, date: { gte: start, lte: end } },
+    select: { date: true, startTime: true, endTime: true, isWorkDay: true },
+  });
+
+  const map: Record<string, { startTime: string | null; endTime: string | null; isWorkDay: boolean }> = {};
+  for (const s of schedules) {
+    map[s.date.toISOString().split("T")[0]] = {
+      startTime: s.startTime,
+      endTime: s.endTime,
+      isWorkDay: s.isWorkDay,
+    };
+  }
+  return map;
+}
+
+export async function getMasterMonthSchedule(masterId: string, year: number, month: number) {
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0);
+
+  const schedules = await prisma.masterSchedule.findMany({
+    where: { masterId, date: { gte: start, lte: end } },
+    select: { date: true, startTime: true, endTime: true, isWorkDay: true },
+  });
+
+  const map: Record<string, { startTime: string | null; endTime: string | null; isWorkDay: boolean }> = {};
+  for (const s of schedules) {
+    map[s.date.toISOString().split("T")[0]] = {
+      startTime: s.startTime,
+      endTime: s.endTime,
+      isWorkDay: s.isWorkDay,
+    };
+  }
+  return map;
+}
+
+export async function getMasterDaySchedule(masterId: string, date: string) {
+  const d = new Date(date + "T00:00:00");
+  return prisma.masterSchedule.findUnique({
+    where: { masterId_date: { masterId, date: d } },
+  });
+}
+
+export async function setMasterDaySchedule(
+  masterId: string,
+  date: string,
+  startTime: string | null,
+  endTime: string | null,
+  isWorkDay: boolean
+) {
+  const d = new Date(date + "T00:00:00");
+
+  await prisma.masterSchedule.upsert({
+    where: { masterId_date: { masterId, date: d } },
+    create: {
+      masterId,
+      date: d,
+      startTime,
+      endTime,
+      isWorkDay,
+    },
+    update: {
+      startTime,
+      endTime,
+      isWorkDay,
+    },
+  });
+
+  revalidatePath("/master/schedule");
+  return { success: true };
+}
+
+export async function deleteMasterDaySchedule(masterId: string, date: string) {
+  const d = new Date(date + "T00:00:00");
+
+  await prisma.masterSchedule.deleteMany({
+    where: { masterId, date: d },
+  });
+
+  revalidatePath("/master/schedule");
+  return { success: true };
 }
 
 // ===== TimeBlock Actions =====
@@ -183,15 +286,14 @@ export async function createTimeBlock(data: {
   clientTg?: string;
   serviceName?: string;
   comment?: string;
+  price?: number;
 }) {
   const d = new Date(data.date + "T00:00:00");
 
-  // Validate times
   if (parseTime(data.startTime) >= parseTime(data.endTime)) {
     throw new Error("Время окончания должно быть позже начала");
   }
 
-  // Check overlap
   const overlap = await checkOverlap(data.masterId, data.date, data.startTime, data.endTime);
   if (overlap) {
     throw new Error(`Пересечение с записью ${overlap.startTime}–${overlap.endTime}`);
@@ -209,6 +311,7 @@ export async function createTimeBlock(data: {
       clientTg: data.clientTg || null,
       serviceName: data.serviceName || null,
       comment: data.comment || null,
+      price: data.price ?? null,
       source: "manual",
       status: data.type === "booking" ? "confirmed" : "confirmed",
     },
@@ -226,12 +329,12 @@ export async function updateTimeBlock(
     serviceName?: string;
     comment?: string;
     status?: string;
+    price?: number;
   }
 ) {
   const block = await prisma.timeBlock.findUnique({ where: { id: blockId } });
   if (!block) throw new Error("Запись не найдена");
 
-  // Validate times if both provided
   if (data.startTime && data.endTime) {
     if (parseTime(data.startTime) >= parseTime(data.endTime)) {
       throw new Error("Время окончания должно быть позже начала");
@@ -256,6 +359,7 @@ export async function updateTimeBlock(
       ...(data.serviceName !== undefined && { serviceName: data.serviceName }),
       ...(data.comment !== undefined && { comment: data.comment }),
       ...(data.status !== undefined && { status: data.status }),
+      ...(data.price !== undefined && { price: data.price }),
     },
   });
 

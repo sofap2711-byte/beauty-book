@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getMasterSession, getMasterBookings, getMasterStats } from "../actions";
+import MasterLayout from "../_components/MasterLayout";
 import MasterDashboardClient from "./MasterDashboardClient";
 
 export default async function MasterDashboardPage({
@@ -17,11 +18,13 @@ export default async function MasterDashboardPage({
   const stats = await getMasterStats(master.id);
 
   return (
-    <MasterDashboardClient
-      masterName={master.name}
-      stats={stats}
-      bookings={bookings}
-      filter={filter}
-    />
+    <MasterLayout masterName={master.name}>
+      <MasterDashboardClient
+        masterName={master.name}
+        stats={stats}
+        bookings={bookings}
+        filter={filter}
+      />
+    </MasterLayout>
   );
 }

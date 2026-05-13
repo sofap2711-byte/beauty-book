@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   getMasterDayBlocks,
   createTimeBlock,
   updateTimeBlock,
   deleteTimeBlock,
-  logoutMaster,
+  getMasterBlocksForMonth,
 } from "../actions";
 import { toast } from "sonner";
 import {
@@ -18,8 +17,6 @@ import {
   CalendarDays,
   CheckCircle2,
   UserPlus,
-  Check,
-  X,
   Lock,
   Phone,
   MessageCircle,
@@ -42,6 +39,7 @@ interface TimeBlock {
   comment: string | null;
   source: string;
   status: string;
+  price: number | null;
 }
 
 interface Props {
@@ -92,55 +90,54 @@ function addMinutes(time: string, minutes: number): string {
   return formatTime(parseTime(time) + minutes);
 }
 
-function getBlockColors(block: TimeBlock) {
+function getBlockStyle(block: TimeBlock) {
   if (block.status === "cancelled" || block.status === "no-show") {
     return {
-      bg: "rgba(255,107,129,0.06)",
-      border: "#FF6B81",
-      glow: "none",
-      icon: X,
-      text: "#FF6B81",
+      bg: "bg-red-50/60",
+      border: "border-red-200",
+      leftBar: "bg-red-400",
+      iconColor: "text-red-400",
+      textColor: "text-red-600",
     };
   }
   if (block.status === "completed") {
     return {
-      bg: "rgba(165,216,255,0.1)",
-      border: "#A5D8FF",
-      glow: "none",
-      icon: Check,
-      text: "#4F8CFF",
+      bg: "bg-sky-50/40",
+      border: "border-sky-200",
+      leftBar: "bg-sky-300",
+      iconColor: "text-sky-400",
+      textColor: "text-sky-600",
     };
   }
   if (block.source === "online") {
     return {
-      bg: "rgba(79,140,255,0.08)",
-      border: "#4F8CFF",
-      glow: "0 0 20px rgba(79,140,255,0.2)",
-      icon: CheckCircle2,
-      text: "#4F8CFF",
+      bg: "bg-sky-50/60",
+      border: "border-sky-300",
+      leftBar: "bg-sky-400",
+      iconColor: "text-sky-400",
+      textColor: "text-slate-900",
     };
   }
   if (block.type === "blocked") {
     return {
-      bg: "rgba(107,123,156,0.04)",
-      border: "#6B7B9C",
-      glow: "none",
-      icon: Lock,
-      text: "#6B7B9C",
+      bg: "bg-slate-50/60",
+      border: "border-slate-200",
+      leftBar: "bg-slate-300",
+      iconColor: "text-slate-400",
+      textColor: "text-slate-500",
     };
   }
   return {
-    bg: "rgba(107,123,156,0.06)",
-    border: "#6B7B9C",
-    glow: "none",
-    icon: UserPlus,
-    text: "#1A1F36",
+    bg: "bg-white/80",
+    border: "border-slate-200",
+    leftBar: "bg-slate-400",
+    iconColor: "text-slate-400",
+    textColor: "text-slate-900",
   };
 }
 
 export default function MasterDiaryClient({
   masterId,
-  masterName,
   startTime,
   endTime,
   initialDate,
@@ -152,12 +149,9 @@ export default function MasterDiaryClient({
   const [modal, setModal] = useState<"add" | "edit" | "calendar" | null>(null);
   const [editingBlock, setEditingBlock] = useState<TimeBlock | null>(null);
 
-  // Calendar month state
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
   const [monthBlocks, setMonthBlocks] = useState<Record<string, { hasBooking: boolean; hasBlocked: boolean }>>({});
-
-
 
   const loadBlocks = useCallback(async () => {
     setLoading(true);
@@ -177,7 +171,6 @@ export default function MasterDiaryClient({
 
   const loadMonthBlocks = useCallback(async () => {
     try {
-      const { getMasterBlocksForMonth } = await import("../actions");
       const data = await getMasterBlocksForMonth(masterId, calYear, calMonth);
       const map: Record<string, { hasBooking: boolean; hasBlocked: boolean }> = {};
       for (const d of data) {
@@ -212,29 +205,25 @@ export default function MasterDiaryClient({
   const stats = useMemo(() => {
     const bookings = blocks.filter((b) => b.type === "booking" && b.status !== "cancelled");
     const completed = blocks.filter((b) => b.status === "completed").length;
-    return { bookings: bookings.length, completed };
+    const revenue = bookings
+      .filter((b) => b.status === "confirmed" || b.status === "completed")
+      .reduce((sum, b) => sum + (b.price || 0), 0);
+    return { bookings: bookings.length, completed, revenue };
   }, [blocks]);
 
-  // Generate timeline slots (hour marks + blocks)
   const timelineItems = useMemo(() => {
     const items: Array<{ kind: "block"; block: TimeBlock } | { kind: "empty"; start: string; end: string }> = [];
-
     const startMin = parseTime(startTime);
     const endMin = parseTime(endTime);
-
-    // Add blocks sorted by startTime
     const sorted = [...blocks].sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
-
     let currentMin = startMin;
 
     for (const block of sorted) {
       const blockStart = parseTime(block.startTime);
       const blockEnd = parseTime(block.endTime);
-
       if (blockStart > currentMin) {
         items.push({ kind: "empty", start: formatTime(currentMin), end: formatTime(blockStart) });
       }
-
       items.push({ kind: "block", block });
       currentMin = Math.max(currentMin, blockEnd);
     }
@@ -247,302 +236,229 @@ export default function MasterDiaryClient({
   }, [blocks, startTime, endTime]);
 
   return (
-    <div className="min-h-screen" style={{ background: "#F0F4F8" }}>
-      {/* Header */}
-      <header
-        style={{ background: "rgba(255,255,255,0.7)", backdropFilter: "blur(12px)" }}
-        className="border-b sticky top-0 z-30"
-      >
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link href="/" className="font-serif text-lg font-300" style={{ color: "#1A1F36", fontFamily: "'Cormorant Garamond', serif" }}>
-            BeautyBook
-          </Link>
-          <div className="flex items-center gap-3">
-            <span className="text-sm hidden sm:inline" style={{ color: "#6B7B9C" }}>{masterName}</span>
-            <form action={logoutMaster}>
-              <button type="submit" className="text-sm transition-colors" style={{ color: "#6B7B9C" }}>
-                Выйти
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
-
-      {/* Navigation */}
-      <nav style={{ background: "rgba(255,255,255,0.7)", backdropFilter: "blur(12px)" }} className="border-b sticky top-14 z-20">
-        <div className="max-w-3xl mx-auto px-4 flex gap-6">
-          <Link href="/master/dashboard" className="py-3 text-sm transition-colors" style={{ color: "#6B7B9C" }}>
-            Записи
-          </Link>
-          <Link href="/master/schedule" className="py-3 text-sm transition-colors" style={{ color: "#6B7B9C" }}>
-            График
-          </Link>
-          <Link
-            href="/master/diary"
-            className="py-3 text-sm border-b-2 transition-colors"
-            style={{ color: "#1A1F36", borderColor: "#4F8CFF" }}
-          >
-            Дневник
-          </Link>
-        </div>
-      </nav>
-
-      <main className="max-w-3xl mx-auto px-4 py-6 pb-32">
-        {/* Day Navigation */}
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={() => navigateDay(-1)}
-            className="p-2 rounded-lg transition-colors hover:bg-white/50"
-            style={{ color: "#6B7B9C" }}
-          >
-            <ChevronLeft className="w-5 h-5" strokeWidth={1.5} />
-          </button>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={goToToday}
-              className="text-xs px-3 py-1.5 rounded-lg border transition-colors hover:bg-white/50"
-              style={{ borderColor: "rgba(99,130,255,0.15)", color: "#6B7B9C" }}
-            >
-              Сегодня
-            </button>
-            <h1
-              className="text-lg font-300"
-              style={{ color: "#1A1F36", fontFamily: "'Cormorant Garamond', serif" }}
-            >
-              {formatDateRu(date)}
-            </h1>
-          </div>
-
-          <button
-            onClick={() => navigateDay(1)}
-            className="p-2 rounded-lg transition-colors hover:bg-white/50"
-            style={{ color: "#6B7B9C" }}
-          >
-            <ChevronRight className="w-5 h-5" strokeWidth={1.5} />
-          </button>
-        </div>
-
-        {/* Micro Stats */}
-        <div className="flex gap-4 mb-6">
-          <div
-            className="flex-1 px-4 py-3 rounded-xl"
-            style={{ background: "rgba(255,255,255,0.7)", backdropFilter: "blur(12px)", border: "1px solid rgba(99,130,255,0.15)" }}
-          >
-            <div className="text-lg font-semibold tabular-nums" style={{ color: "#1A1F36" }}>
-              {stats.bookings}
-            </div>
-            <div className="text-xs" style={{ color: "#6B7B9C" }}>Записи</div>
-          </div>
-          <div
-            className="flex-1 px-4 py-3 rounded-xl"
-            style={{ background: "rgba(255,255,255,0.7)", backdropFilter: "blur(12px)", border: "1px solid rgba(99,130,255,0.15)" }}
-          >
-            <div className="text-lg font-semibold tabular-nums" style={{ color: "#1A1F36" }}>
-              {stats.completed}
-            </div>
-            <div className="text-xs" style={{ color: "#6B7B9C" }}>Завершено</div>
-          </div>
-          <button
-            onClick={() => setModal("calendar")}
-            className="flex-1 px-4 py-3 rounded-xl flex flex-col items-center justify-center transition-colors hover:bg-white/80"
-            style={{ background: "rgba(255,255,255,0.7)", backdropFilter: "blur(12px)", border: "1px solid rgba(99,130,255,0.15)" }}
-          >
-            <CalendarDays className="w-5 h-5 mb-1" strokeWidth={1.5} style={{ color: "#4F8CFF" }} />
-            <div className="text-xs" style={{ color: "#6B7B9C" }}>Календарь</div>
-          </button>
-        </div>
-
-        {/* Add Button */}
+    <div>
+      {/* Day Navigation */}
+      <div className="flex items-center justify-between mb-6">
         <button
-          onClick={() => {
-            setEditingBlock(null);
-            setModal("add");
-          }}
-          className="w-full mb-6 py-3 rounded-xl flex items-center justify-center gap-2 transition-all hover:shadow-md"
-          style={{
-            background: "rgba(79,140,255,0.08)",
-            border: "1px solid #4F8CFF",
-            color: "#4F8CFF",
-          }}
+          onClick={() => navigateDay(-1)}
+          className="p-2 border border-slate-200 text-slate-500 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-colors"
         >
-          <Plus className="w-5 h-5" strokeWidth={1.5} />
-          <span className="text-sm font-medium">Добавить запись</span>
+          <ChevronLeft className="w-5 h-5" strokeWidth={1.5} />
         </button>
 
-        {/* Timeline */}
-        <div className="space-y-3">
-          {loading ? (
-            <div className="text-center py-12 text-sm" style={{ color: "#6B7B9C" }}>
-              Загрузка...
-            </div>
-          ) : timelineItems.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-sm mb-4" style={{ color: "#6B7B9C" }}>
-                Нет записей на этот день
-              </div>
-              <button
-                onClick={() => setModal("add")}
-                className="text-sm px-4 py-2 rounded-lg transition-colors"
-                style={{ background: "rgba(79,140,255,0.08)", color: "#4F8CFF", border: "1px solid #4F8CFF" }}
-              >
-                Добавить первую запись
-              </button>
-            </div>
-          ) : (
-            timelineItems.map((item, idx) => {
-              if (item.kind === "empty") {
-                return (
-                  <button
-                    key={`empty-${idx}`}
-                    onClick={() => {
-                      setEditingBlock(null);
-                      setModal("add");
-                    }}
-                    className="w-full py-2 rounded-xl flex items-center justify-center gap-1 transition-colors hover:bg-white/50"
-                    style={{
-                      background: "rgba(255,255,255,0.4)",
-                      border: "1px dashed rgba(99,130,255,0.2)",
-                      color: "#6B7B9C",
-                    }}
-                  >
-                    <Plus className="w-4 h-4" strokeWidth={1.5} />
-                    <span className="text-xs">
-                      {item.start} – {item.end}
-                    </span>
-                  </button>
-                );
-              }
+        <div className="flex items-center gap-3">
+          <button
+            onClick={goToToday}
+            className="text-xs px-3 py-1.5 border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors uppercase tracking-wider"
+          >
+            Сегодня
+          </button>
+          <h1 className="font-serif text-xl font-300 text-slate-900">
+            {formatDateRu(date)}
+          </h1>
+        </div>
 
-              const block = item.block;
-              const colors = getBlockColors(block);
-              const Icon = colors.icon;
-              const duration = parseTime(block.endTime) - parseTime(block.startTime);
+        <button
+          onClick={() => navigateDay(1)}
+          className="p-2 border border-slate-200 text-slate-500 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-colors"
+        >
+          <ChevronRight className="w-5 h-5" strokeWidth={1.5} />
+        </button>
+      </div>
 
+      {/* Stats */}
+      <div className="flex gap-4 mb-6">
+        <div className="flex-1 bg-white/80 backdrop-blur-md border border-slate-200/60 px-6 py-4">
+          <div className="text-3xl font-serif font-300 text-slate-900">{stats.bookings}</div>
+          <div className="text-xs uppercase tracking-wide text-slate-500 mt-1">Записи</div>
+        </div>
+        <div className="flex-1 bg-white/80 backdrop-blur-md border border-slate-200/60 px-6 py-4">
+          <div className="text-3xl font-serif font-300 text-slate-900">{stats.completed}</div>
+          <div className="text-xs uppercase tracking-wide text-slate-500 mt-1">Завершено</div>
+        </div>
+        <div className="flex-1 bg-white/80 backdrop-blur-md border border-slate-200/60 px-6 py-4">
+          <div className="text-3xl font-serif font-300 text-emerald-600">
+            {stats.revenue.toLocaleString("ru-RU")} ₽
+          </div>
+          <div className="text-xs uppercase tracking-wide text-slate-500 mt-1">Выручка</div>
+        </div>
+        <button
+          onClick={() => setModal("calendar")}
+          className="flex-1 bg-white/80 backdrop-blur-md border border-slate-200/60 px-6 py-4 flex flex-col items-center justify-center hover:bg-white transition-colors"
+        >
+          <CalendarDays className="w-5 h-5 mb-1 text-sky-400" strokeWidth={1.5} />
+          <div className="text-xs uppercase tracking-wide text-slate-500">Календарь</div>
+        </button>
+      </div>
+
+      {/* Add Button */}
+      <button
+        onClick={() => {
+          setEditingBlock(null);
+          setModal("add");
+        }}
+        className="w-full mb-6 py-3 bg-slate-900 text-white text-sm tracking-wide hover:bg-slate-800 transition-colors"
+      >
+        <span className="flex items-center justify-center gap-2">
+          <Plus className="w-4 h-4" strokeWidth={1.5} />
+          Добавить запись
+        </span>
+      </button>
+
+      {/* Timeline */}
+      <div className="space-y-3">
+        {loading ? (
+          <div className="text-center py-12 text-sm text-slate-400">Загрузка...</div>
+        ) : timelineItems.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-sm text-slate-400 mb-4">Нет записей на этот день</div>
+            <button
+              onClick={() => setModal("add")}
+              className="text-sm px-4 py-2 bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+            >
+              Добавить первую запись
+            </button>
+          </div>
+        ) : (
+          timelineItems.map((item, idx) => {
+            if (item.kind === "empty") {
               return (
-                <div
-                  key={block.id}
-                  className="relative rounded-xl overflow-hidden transition-all hover:shadow-lg"
-                  style={{
-                    background: colors.bg,
-                    border: `1px solid ${colors.border}`,
-                    boxShadow: colors.glow,
-                    backdropFilter: "blur(12px)",
+                <button
+                  key={`empty-${idx}`}
+                  onClick={() => {
+                    setEditingBlock(null);
+                    setModal("add");
                   }}
+                  className="w-full py-2 border border-dashed border-slate-200 flex items-center justify-center gap-1 text-slate-400 hover:border-sky-400 hover:text-sky-500 transition-colors"
                 >
-                  {/* Left indicator */}
-                  <div
-                    className="absolute left-0 top-0 bottom-0 w-[3px]"
-                    style={{ background: colors.border }}
-                  />
+                  <Plus className="w-4 h-4" strokeWidth={1.5} />
+                  <span className="text-xs">
+                    {item.start} – {item.end}
+                  </span>
+                </button>
+              );
+            }
 
-                  <div className="pl-4 pr-3 py-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        {/* Time */}
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-base font-semibold tabular-nums" style={{ color: "#1A1F36" }}>
-                            {block.startTime}
-                          </span>
-                          <span className="text-xs" style={{ color: "#6B7B9C" }}>
-                            – {block.endTime}
-                          </span>
-                          <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(107,123,156,0.1)", color: "#6B7B9C" }}>
-                            {duration} мин
-                          </span>
-                        </div>
+            const block = item.block;
+            const style = getBlockStyle(block);
+            const duration = parseTime(block.endTime) - parseTime(block.startTime);
+            const isBlocked = block.type === "blocked";
 
-                        {/* Client / Title */}
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <Icon className="w-4 h-4 flex-shrink-0" strokeWidth={1.5} style={{ color: colors.text }} />
-                          <span className="text-sm font-medium truncate" style={{ color: "#1A1F36" }}>
-                            {block.type === "blocked"
-                              ? "Личное время"
-                              : block.clientName || "Без имени"}
-                          </span>
-                          {block.source === "online" && (
-                            <span
-                              className="w-2 h-2 rounded-full flex-shrink-0"
-                              style={{ background: "#4F8CFF" }}
-                              title="Онлайн-запись"
-                            />
-                          )}
-                        </div>
+            return (
+              <div
+                key={block.id}
+                className={`relative border ${style.bg} ${style.border} overflow-hidden transition-all hover:shadow-sm`}
+              >
+                {/* Left indicator */}
+                <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${style.leftBar}`} />
 
-                        {/* Service */}
-                        {block.serviceName && (
-                          <div className="text-xs mb-1" style={{ color: "#6B7B9C" }}>
-                            {block.serviceName}
+                <div className="pl-4 pr-3 py-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      {/* Time */}
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-base font-semibold tabular-nums text-slate-900">
+                          {block.startTime}
+                        </span>
+                        <span className="text-xs text-slate-400">– {block.endTime}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 uppercase tracking-wider">
+                          {duration} мин
+                        </span>
+                      </div>
+
+                      {/* Client / Title */}
+                      <div className="flex items-center gap-1.5 mb-1">
+                        {isBlocked ? (
+                          <Lock className="w-4 h-4 flex-shrink-0 text-slate-400" strokeWidth={1.5} />
+                        ) : block.source === "online" ? (
+                          <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-sky-400" strokeWidth={1.5} />
+                        ) : (
+                          <UserPlus className="w-4 h-4 flex-shrink-0 text-slate-400" strokeWidth={1.5} />
+                        )}
+                        <span className="text-sm font-medium text-slate-900 truncate">
+                          {isBlocked ? "Личное время" : block.clientName || "Без имени"}
+                        </span>
+                        {block.source === "online" && (
+                          <span className="w-2 h-2 rounded-full bg-sky-400 flex-shrink-0" title="Онлайн-запись" />
+                        )}
+                      </div>
+
+                      {/* Service */}
+                      {block.serviceName && (
+                        <div className="text-xs text-slate-500 mb-1">{block.serviceName}</div>
+                      )}
+
+                      {/* Contact info */}
+                      <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+                        {block.clientPhone && (
+                          <div className="flex items-center gap-1">
+                            <Phone className="w-3 h-3" strokeWidth={1.5} />
+                            {block.clientPhone}
                           </div>
                         )}
+                        {block.clientTg && (
+                          <div className="flex items-center gap-1">
+                            <MessageCircle className="w-3 h-3" strokeWidth={1.5} />
+                            {block.clientTg}
+                          </div>
+                        )}
+                        {block.price !== null && block.price > 0 && (
+                          <div className="flex items-center gap-1 text-slate-700 font-medium">
+                            💰 {block.price.toLocaleString("ru-RU")} ₽
+                          </div>
+                        )}
+                        {block.comment && (
+                          <div className="flex items-center gap-1">
+                            <FileText className="w-3 h-3" strokeWidth={1.5} />
+                            {block.comment}
+                          </div>
+                        )}
+                      </div>
 
-                        {/* Contact info */}
-                        <div className="flex flex-wrap gap-3 text-xs" style={{ color: "#6B7B9C" }}>
-                          {block.clientPhone && (
-                            <div className="flex items-center gap-1">
-                              <Phone className="w-3 h-3" strokeWidth={1.5} />
-                              {block.clientPhone}
-                            </div>
-                          )}
-                          {block.clientTg && (
-                            <div className="flex items-center gap-1">
-                              <MessageCircle className="w-3 h-3" strokeWidth={1.5} />
-                              {block.clientTg}
-                            </div>
-                          )}
-                          {block.comment && (
-                            <div className="flex items-center gap-1">
-                              <FileText className="w-3 h-3" strokeWidth={1.5} />
-                              {block.comment}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Status */}
+                      {/* Status */}
+                      {!isBlocked && (
                         <div className="mt-1.5">
-                          <span className="text-[10px] uppercase tracking-wider" style={{ color: "#6B7B9C" }}>
+                          <span className="text-[10px] uppercase tracking-wider text-slate-400">
                             {STATUS_LABELS[block.status] || block.status}
                           </span>
                         </div>
-                      </div>
+                      )}
+                    </div>
 
-                      {/* Actions */}
-                      <div className="flex items-center gap-1 ml-2">
-                        <button
-                          onClick={() => {
-                            setEditingBlock(block);
-                            setModal("edit");
-                          }}
-                          className="p-1.5 rounded-lg transition-colors hover:bg-white/50"
-                          style={{ color: "#6B7B9C" }}
-                        >
-                          <Pencil className="w-4 h-4" strokeWidth={1.5} />
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (!confirm("Удалить запись?")) return;
-                            try {
-                              await deleteTimeBlock(block.id);
-                              toast.success("Запись удалена");
-                              loadBlocks();
-                            } catch (err) {
-                              toast.error(err instanceof Error ? err.message : "Ошибка удаления");
-                            }
-                          }}
-                          className="p-1.5 rounded-lg transition-colors hover:bg-red-50"
-                          style={{ color: "#FF6B81" }}
-                        >
-                          <Trash2 className="w-4 h-4" strokeWidth={1.5} />
-                        </button>
-                      </div>
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 ml-2">
+                      <button
+                        onClick={() => {
+                          setEditingBlock(block);
+                          setModal("edit");
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors"
+                      >
+                        <Pencil className="w-4 h-4" strokeWidth={1.5} />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(isBlocked ? "Удалить блокировку?" : "Удалить запись?")) return;
+                          try {
+                            await deleteTimeBlock(block.id);
+                            toast.success(isBlocked ? "Блокировка удалена" : "Запись удалена");
+                            loadBlocks();
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : "Ошибка удаления");
+                          }
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" strokeWidth={1.5} />
+                      </button>
                     </div>
                   </div>
                 </div>
-              );
-            })
-          )}
-        </div>
-      </main>
+              </div>
+            );
+          })
+        )}
+      </div>
 
       {/* Add Modal */}
       {modal === "add" && (
@@ -615,6 +531,7 @@ function AddEditModal({
 }) {
   const isEdit = mode === "edit";
   const isOnline = block?.source === "online";
+  const isBlocked = block?.type === "blocked";
 
   const [startTime, setStartTime] = useState(block?.startTime || "10:00");
   const [endTime, setEndTime] = useState(block?.endTime || "10:30");
@@ -626,6 +543,7 @@ function AddEditModal({
   const [clientPhone, setClientPhone] = useState(block?.clientPhone || "");
   const [clientTg, setClientTg] = useState(block?.clientTg || "");
   const [serviceName, setServiceName] = useState(block?.serviceName || "");
+  const [price, setPrice] = useState(block?.price?.toString() || "");
   const [comment, setComment] = useState(block?.comment || "");
   const [status, setStatus] = useState(block?.status || "confirmed");
   const [saving, setSaving] = useState(false);
@@ -657,6 +575,7 @@ function AddEditModal({
           serviceName: serviceName || undefined,
           comment: comment || undefined,
           status,
+          price: price ? parseInt(price, 10) : undefined,
         });
         toast.success("Запись обновлена");
       } else {
@@ -671,6 +590,7 @@ function AddEditModal({
           clientTg: clientTg || undefined,
           serviceName: type === "booking" ? serviceName : undefined,
           comment: comment || undefined,
+          price: price ? parseInt(price, 10) : undefined,
         });
         toast.success("Запись создана");
       }
@@ -685,80 +605,51 @@ function AddEditModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div
-        className="relative w-full sm:w-[480px] sm:max-h-[85vh] max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl"
-        style={{
-          background: "rgba(255,255,255,0.95)",
-          backdropFilter: "blur(20px)",
-        }}
-      >
-        <form onSubmit={handleSubmit} className="p-5 sm:p-6">
-          <h2
-            className="text-xl font-300 mb-5"
-            style={{ color: "#1A1F36", fontFamily: "'Cormorant Garamond', serif" }}
-          >
-            {isEdit ? "Редактировать запись" : "Добавить запись"}
+      <div className="relative w-full sm:w-[480px] sm:max-h-[85vh] max-h-[90vh] overflow-y-auto bg-white/95 backdrop-blur-lg border border-slate-200/60">
+        <form onSubmit={handleSubmit} className="p-6">
+          <h2 className="font-serif text-2xl font-300 text-slate-900 mb-6">
+            {isEdit ? (isBlocked ? "Редактировать блокировку" : "Редактировать запись") : "Добавить запись"}
           </h2>
 
           {/* Time */}
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
-              <label className="block text-xs mb-1.5" style={{ color: "#6B7B9C" }}>
-                Начало
-              </label>
+              <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Начало</label>
               <input
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg text-sm outline-none transition-colors"
-                style={{
-                  background: "rgba(240,244,248,0.8)",
-                  border: "1px solid rgba(99,130,255,0.15)",
-                  color: "#1A1F36",
-                }}
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400/20"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs mb-1.5" style={{ color: "#6B7B9C" }}>
-                Окончание
-              </label>
+              <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Окончание</label>
               <input
                 type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg text-sm outline-none transition-colors"
-                style={{
-                  background: "rgba(240,244,248,0.8)",
-                  border: "1px solid rgba(99,130,255,0.15)",
-                  color: "#1A1F36",
-                }}
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400/20"
                 required
               />
             </div>
           </div>
 
-          {/* Duration buttons (only in add mode) */}
+          {/* Duration (add only) */}
           {!isEdit && (
             <div className="mb-4">
-              <label className="block text-xs mb-1.5" style={{ color: "#6B7B9C" }}>
-                Длительность
-              </label>
+              <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Длительность</label>
               <div className="flex gap-2 mb-2">
                 {DURATIONS.map((d) => (
                   <button
                     key={d}
                     type="button"
-                    onClick={() => {
-                      setUseCustomDuration(false);
-                      setDuration(d);
-                    }}
-                    className="flex-1 py-2 text-xs rounded-lg border transition-all"
-                    style={{
-                      borderColor: !useCustomDuration && duration === d ? "#4F8CFF" : "rgba(99,130,255,0.15)",
-                      background: !useCustomDuration && duration === d ? "rgba(79,140,255,0.08)" : "transparent",
-                      color: !useCustomDuration && duration === d ? "#4F8CFF" : "#6B7B9C",
-                    }}
+                    onClick={() => { setUseCustomDuration(false); setDuration(d); }}
+                    className={`flex-1 py-2 text-xs border transition-all ${
+                      !useCustomDuration && duration === d
+                        ? "border-sky-400 bg-sky-50 text-sky-600"
+                        : "border-slate-200 text-slate-500 hover:border-slate-300"
+                    }`}
                   >
                     {d} мин
                   </button>
@@ -766,12 +657,11 @@ function AddEditModal({
                 <button
                   type="button"
                   onClick={() => setUseCustomDuration(true)}
-                  className="flex-1 py-2 text-xs rounded-lg border transition-all"
-                  style={{
-                    borderColor: useCustomDuration ? "#4F8CFF" : "rgba(99,130,255,0.15)",
-                    background: useCustomDuration ? "rgba(79,140,255,0.08)" : "transparent",
-                    color: useCustomDuration ? "#4F8CFF" : "#6B7B9C",
-                  }}
+                  className={`flex-1 py-2 text-xs border transition-all ${
+                    useCustomDuration
+                      ? "border-sky-400 bg-sky-50 text-sky-600"
+                      : "border-slate-200 text-slate-500 hover:border-slate-300"
+                  }`}
                 >
                   Своя
                 </button>
@@ -782,45 +672,36 @@ function AddEditModal({
                   placeholder="Минуты"
                   value={customDuration}
                   onChange={(e) => setCustomDuration(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
-                  style={{
-                    background: "rgba(240,244,248,0.8)",
-                    border: "1px solid rgba(99,130,255,0.15)",
-                    color: "#1A1F36",
-                  }}
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-sky-400"
                 />
               )}
             </div>
           )}
 
-          {/* Type */}
+          {/* Type (add only) */}
           {!isEdit && (
             <div className="mb-4">
-              <label className="block text-xs mb-1.5" style={{ color: "#6B7B9C" }}>
-                Тип
-              </label>
+              <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Тип</label>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setType("booking")}
-                  className="flex-1 py-2 text-xs rounded-lg border transition-all"
-                  style={{
-                    borderColor: type === "booking" ? "#4F8CFF" : "rgba(99,130,255,0.15)",
-                    background: type === "booking" ? "rgba(79,140,255,0.08)" : "transparent",
-                    color: type === "booking" ? "#4F8CFF" : "#6B7B9C",
-                  }}
+                  className={`flex-1 py-2 text-xs border transition-all ${
+                    type === "booking"
+                      ? "border-sky-400 bg-sky-50 text-sky-600"
+                      : "border-slate-200 text-slate-500 hover:border-slate-300"
+                  }`}
                 >
                   Запись клиента
                 </button>
                 <button
                   type="button"
                   onClick={() => setType("blocked")}
-                  className="flex-1 py-2 text-xs rounded-lg border transition-all"
-                  style={{
-                    borderColor: type === "blocked" ? "#6B7B9C" : "rgba(99,130,255,0.15)",
-                    background: type === "blocked" ? "rgba(107,123,156,0.08)" : "transparent",
-                    color: type === "blocked" ? "#6B7B9C" : "#6B7B9C",
-                  }}
+                  className={`flex-1 py-2 text-xs border transition-all ${
+                    type === "blocked"
+                      ? "border-slate-400 bg-slate-50 text-slate-600"
+                      : "border-slate-200 text-slate-500 hover:border-slate-300"
+                  }`}
                 >
                   Блокировка
                 </button>
@@ -828,140 +709,111 @@ function AddEditModal({
             </div>
           )}
 
-          {/* Client Name */}
-          {type === "booking" && (
-            <div className="mb-3">
-              <label className="block text-xs mb-1.5" style={{ color: "#6B7B9C" }}>
-                Имя клиента {isOnline && "(нельзя изменить)"}
-              </label>
-              <input
-                type="text"
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                disabled={isOnline}
-                required={type === "booking"}
-                className="w-full px-3 py-2.5 rounded-lg text-sm outline-none transition-colors disabled:opacity-50"
-                style={{
-                  background: "rgba(240,244,248,0.8)",
-                  border: "1px solid rgba(99,130,255,0.15)",
-                  color: "#1A1F36",
-                }}
-                placeholder="Имя"
-              />
-            </div>
-          )}
+          {/* Booking fields */}
+          {type === "booking" && !isBlocked && (
+            <>
+              <div className="mb-3">
+                <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">
+                  Имя клиента {isOnline && "(нельзя изменить)"}
+                </label>
+                <input
+                  type="text"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  disabled={isOnline}
+                  required={type === "booking"}
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400/20 disabled:opacity-50"
+                  placeholder="Имя"
+                />
+              </div>
 
-          {/* Phone */}
-          {type === "booking" && (
-            <div className="mb-3">
-              <label className="block text-xs mb-1.5" style={{ color: "#6B7B9C" }}>
-                Телефон {isOnline && "(нельзя изменить)"}
-              </label>
-              <input
-                type="tel"
-                value={clientPhone}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/\D/g, "");
-                  if (v.length <= 11) {
-                    let formatted = v;
-                    if (v.length > 0 && !v.startsWith("7")) {
-                      formatted = "7" + v;
+              <div className="mb-3">
+                <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">
+                  Телефон {isOnline && "(нельзя изменить)"}
+                </label>
+                <input
+                  type="tel"
+                  value={clientPhone}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/\D/g, "");
+                    if (v.length <= 11) {
+                      let formatted = v;
+                      if (v.length > 0 && !v.startsWith("7")) formatted = "7" + v;
+                      setClientPhone("+" + formatted);
                     }
-                    setClientPhone("+" + formatted);
-                  }
-                }}
-                disabled={isOnline}
-                className="w-full px-3 py-2.5 rounded-lg text-sm outline-none transition-colors disabled:opacity-50"
-                style={{
-                  background: "rgba(240,244,248,0.8)",
-                  border: "1px solid rgba(99,130,255,0.15)",
-                  color: "#1A1F36",
-                }}
-                placeholder="+7"
-              />
-            </div>
+                  }}
+                  disabled={isOnline}
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400/20 disabled:opacity-50"
+                  placeholder="+7"
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Telegram</label>
+                <input
+                  type="text"
+                  value={clientTg}
+                  onChange={(e) => setClientTg(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400/20"
+                  placeholder="@username"
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Услуга</label>
+                <input
+                  type="text"
+                  value={serviceName}
+                  onChange={(e) => setServiceName(e.target.value)}
+                  required={type === "booking"}
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400/20"
+                  placeholder="Название услуги"
+                />
+              </div>
+            </>
           )}
 
-          {/* Telegram */}
-          {type === "booking" && (
+          {/* Price */}
+          {type === "booking" && !isBlocked && (
             <div className="mb-3">
-              <label className="block text-xs mb-1.5" style={{ color: "#6B7B9C" }}>
-                Telegram
-              </label>
+              <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Стоимость, ₽</label>
               <input
-                type="text"
-                value={clientTg}
-                onChange={(e) => setClientTg(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
-                style={{
-                  background: "rgba(240,244,248,0.8)",
-                  border: "1px solid rgba(99,130,255,0.15)",
-                  color: "#1A1F36",
-                }}
-                placeholder="@username"
-              />
-            </div>
-          )}
-
-          {/* Service */}
-          {type === "booking" && (
-            <div className="mb-3">
-              <label className="block text-xs mb-1.5" style={{ color: "#6B7B9C" }}>
-                Услуга
-              </label>
-              <input
-                type="text"
-                value={serviceName}
-                onChange={(e) => setServiceName(e.target.value)}
-                required={type === "booking"}
-                className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
-                style={{
-                  background: "rgba(240,244,248,0.8)",
-                  border: "1px solid rgba(99,130,255,0.15)",
-                  color: "#1A1F36",
-                }}
-                placeholder="Название услуги"
+                type="number"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400/20"
+                placeholder="1500"
               />
             </div>
           )}
 
           {/* Comment */}
           <div className="mb-4">
-            <label className="block text-xs mb-1.5" style={{ color: "#6B7B9C" }}>
-              Комментарий
-            </label>
+            <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Комментарий</label>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               rows={2}
-              className="w-full px-3 py-2.5 rounded-lg text-sm outline-none resize-none"
-              style={{
-                background: "rgba(240,244,248,0.8)",
-                border: "1px solid rgba(99,130,255,0.15)",
-                color: "#1A1F36",
-              }}
+              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400/20 resize-none"
               placeholder="Примечания..."
             />
           </div>
 
-          {/* Status chips (edit only) */}
-          {isEdit && (
+          {/* Status chips (edit booking only) */}
+          {isEdit && !isBlocked && (
             <div className="mb-4">
-              <label className="block text-xs mb-1.5" style={{ color: "#6B7B9C" }}>
-                Статус
-              </label>
+              <label className="block text-xs uppercase tracking-wider text-slate-400 mb-2">Статус</label>
               <div className="flex flex-wrap gap-2">
                 {STATUS_CHIPS.map((s) => (
                   <button
                     key={s.key}
                     type="button"
                     onClick={() => setStatus(s.key)}
-                    className="px-3 py-1.5 text-xs rounded-lg border transition-all"
-                    style={{
-                      borderColor: status === s.key ? "#4F8CFF" : "rgba(99,130,255,0.15)",
-                      background: status === s.key ? "rgba(79,140,255,0.08)" : "transparent",
-                      color: status === s.key ? "#4F8CFF" : "#6B7B9C",
-                    }}
+                    className={`px-3 py-1.5 text-xs border transition-all ${
+                      status === s.key
+                        ? "border-sky-400 bg-sky-50 text-sky-600"
+                        : "border-slate-200 text-slate-500 hover:border-slate-300"
+                    }`}
                   >
                     {s.label}
                   </button>
@@ -975,23 +827,14 @@ function AddEditModal({
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 py-3 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
-              style={{
-                background: "#1A1F36",
-                color: "#fff",
-              }}
+              className="flex-1 py-3 bg-slate-900 text-white text-sm tracking-wide hover:bg-slate-800 transition-colors disabled:opacity-50"
             >
               {saving ? "Сохранение..." : isEdit ? "Сохранить" : "Создать"}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 rounded-xl text-sm transition-all"
-              style={{
-                background: "rgba(240,244,248,0.8)",
-                color: "#6B7B9C",
-                border: "1px solid rgba(99,130,255,0.15)",
-              }}
+              className="flex-1 py-3 border border-slate-200 text-slate-700 text-sm tracking-wide hover:bg-slate-50 transition-colors"
             >
               Отмена
             </button>
@@ -1036,41 +879,30 @@ function CalendarModal({
   function navigateMonth(delta: number) {
     let newMonth = month + delta;
     let newYear = year;
-    if (newMonth > 12) {
-      newMonth = 1;
-      newYear++;
-    } else if (newMonth < 1) {
-      newMonth = 12;
-      newYear--;
-    }
+    if (newMonth > 12) { newMonth = 1; newYear++; }
+    else if (newMonth < 1) { newMonth = 12; newYear--; }
     onChangeMonth(newYear, newMonth);
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div
-        className="relative w-full sm:w-[360px] rounded-t-2xl sm:rounded-2xl p-5"
-        style={{
-          background: "rgba(255,255,255,0.95)",
-          backdropFilter: "blur(20px)",
-        }}
-      >
+      <div className="relative w-full sm:w-[360px] bg-white/95 backdrop-blur-lg border border-slate-200/60 p-5">
         <div className="flex items-center justify-between mb-4">
-          <button onClick={() => navigateMonth(-1)} className="p-1" style={{ color: "#6B7B9C" }}>
+          <button onClick={() => navigateMonth(-1)} className="p-1 text-slate-500 hover:text-slate-900">
             <ChevronLeft className="w-5 h-5" strokeWidth={1.5} />
           </button>
-          <span className="text-sm font-medium" style={{ color: "#1A1F36" }}>
+          <span className="text-sm font-medium text-slate-900">
             {monthNames[month - 1]} {year}
           </span>
-          <button onClick={() => navigateMonth(1)} className="p-1" style={{ color: "#6B7B9C" }}>
+          <button onClick={() => navigateMonth(1)} className="p-1 text-slate-500 hover:text-slate-900">
             <ChevronRight className="w-5 h-5" strokeWidth={1.5} />
           </button>
         </div>
 
         <div className="grid grid-cols-7 gap-1 mb-2">
           {weekDays.map((d) => (
-            <div key={d} className="text-center text-[10px] py-1" style={{ color: "#6B7B9C" }}>
+            <div key={d} className="text-center text-[10px] py-1 text-slate-400 uppercase tracking-wider">
               {d}
             </div>
           ))}
@@ -1091,20 +923,17 @@ function CalendarModal({
               <button
                 key={day}
                 onClick={() => onSelect(dateStr)}
-                className="aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all"
-                style={{
-                  background: isSelected ? "rgba(79,140,255,0.12)" : "transparent",
-                  border: isToday ? "1px solid #4F8CFF" : isSelected ? "1px solid rgba(79,140,255,0.3)" : "1px solid transparent",
-                  color: isSelected ? "#4F8CFF" : "#1A1F36",
-                }}
+                className={`aspect-square flex flex-col items-center justify-center gap-0.5 transition-all ${
+                  isSelected
+                    ? "bg-sky-50 border border-sky-400 text-sky-600"
+                    : isToday
+                    ? "border border-sky-400 text-slate-900"
+                    : "border border-transparent text-slate-700 hover:bg-slate-50"
+                }`}
               >
                 <span className="text-sm">{day}</span>
-                {blocks?.hasBooking && (
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#4F8CFF" }} />
-                )}
-                {!blocks?.hasBooking && blocks?.hasBlocked && (
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#6B7B9C" }} />
-                )}
+                {blocks?.hasBooking && <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />}
+                {!blocks?.hasBooking && blocks?.hasBlocked && <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />}
               </button>
             );
           })}

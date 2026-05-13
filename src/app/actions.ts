@@ -81,7 +81,8 @@ export async function createBooking(
   clientPhone: string,
   serviceName: string,
   clientTg?: string,
-  comment?: string
+  comment?: string,
+  price?: number
 ) {
   const d = new Date(date + "T00:00:00");
 
@@ -115,6 +116,7 @@ export async function createBooking(
       serviceName,
       source: "online",
       status: "confirmed",
+      price: price ?? null,
     },
   });
 

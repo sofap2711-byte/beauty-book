@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getMasterSession } from "../actions";
+import MasterLayout from "../_components/MasterLayout";
 import MasterScheduleClient from "./MasterScheduleClient";
 
 export default async function MasterSchedulePage() {
@@ -9,13 +10,13 @@ export default async function MasterSchedulePage() {
   }
 
   return (
-    <MasterScheduleClient
-      masterId={master.id}
-      initialData={{
-        workDays: master.workDays,
-        startTime: master.startTime,
-        endTime: master.endTime,
-      }}
-    />
+    <MasterLayout masterName={master.name}>
+      <MasterScheduleClient
+        masterId={master.id}
+        defaultStartTime={master.startTime}
+        defaultEndTime={master.endTime}
+        defaultWorkDays={master.workDays}
+      />
+    </MasterLayout>
   );
 }

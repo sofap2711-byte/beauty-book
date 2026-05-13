@@ -9,6 +9,7 @@ const masterCredentials: Record<string, { email: string; password: string }> = {
 };
 
 async function main() {
+  await prisma.masterSchedule.deleteMany();
   await prisma.timeBlock.deleteMany();
   await prisma.master.deleteMany();
   await prisma.subService.deleteMany();
@@ -181,6 +182,7 @@ async function main() {
           const end = new Date(start.getTime() + 30 * 60000);
           const endTime = `${end.getHours().toString().padStart(2, "0")}:${end.getMinutes().toString().padStart(2, "0")}`;
 
+          const prices = [1200, 1500, 2000, 2500, 3000, 3500, 4000, 1800, 2200, 2800];
           timeBlocksBatch.push({
             masterId: master.id,
             date: date,
@@ -191,8 +193,10 @@ async function main() {
             clientPhone: isBooked ? "+79991234567" : null,
             clientTg: isBooked ? "@demo" : null,
             serviceName: isBooked ? service.name : null,
+            comment: isBooked ? "Демо-комментарий" : null,
             source: isBooked ? "online" : "manual",
             status: isBooked ? "confirmed" : "confirmed",
+            price: isBooked ? prices[Math.floor(rand(seed++) * prices.length)] : null,
           });
         }
       }
@@ -207,7 +211,33 @@ async function main() {
     });
   }
 
-  console.log("Seed completed successfully. TimeBlocks created:", timeBlocksBatch.length);
+  // Create some MasterSchedule overrides for demo
+  const allMasters = await prisma.master.findMany({ select: { id: true } });
+  const scheduleOverrides: any[] = [];
+  for (const m of allMasters) {
+    for (let day = 0; day < 7; day++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + day);
+      date.setHours(0, 0, 0, 0);
+      if (day === 5 || day === 6) {
+        scheduleOverrides.push({
+          masterId: m.id,
+          date: date,
+          startTime: "10:00",
+          endTime: "18:00",
+          isWorkDay: true,
+        });
+      }
+    }
+  }
+  if (scheduleOverrides.length > 0) {
+    await prisma.masterSchedule.createMany({
+      data: scheduleOverrides,
+      skipDuplicates: true,
+    });
+  }
+
+  console.log("Seed completed successfully. TimeBlocks created:", timeBlocksBatch.length, "Schedule overrides:", scheduleOverrides.length);
 }
 
 main()
