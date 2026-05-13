@@ -86,6 +86,14 @@ export default function Nav() {
           >
             Записаться
           </button>
+
+          <Link
+            href="/master/login"
+            className="text-base text-slate-700 hover:text-slate-900 transition-colors"
+            onClick={() => setOpen(false)}
+          >
+            Кабинет мастера
+          </Link>
         </div>
       )}
     </nav>

@@ -1,6 +1,12 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+
+const masterCredentials: Record<string, { email: string; password: string }> = {
+  "maria-hair": { email: "maria@example.com", password: "master123" },
+  "irina-hair": { email: "irina@example.com", password: "master123" },
+};
 
 async function main() {
   await prisma.booking.deleteMany();
@@ -23,8 +29,8 @@ async function main() {
         { id: "muzhskaya", name: "Мужская стрижка", description: "Классическая, undercut, fade", price: "от 900₽" },
       ],
       masters: [
-        { id: "maria-hair", name: "Мария", role: "Стилист-парикмахер", instagram: "maria_hair" },
-        { id: "irina-hair", name: "Ирина", role: "Топ-стилист", instagram: "irina_top" },
+        { id: "maria-hair", name: "Мария", role: "Стилист-парикмахер", instagram: "maria_hair", email: "maria@example.com" },
+        { id: "irina-hair", name: "Ирина", role: "Топ-стилист", instagram: "irina_top", email: "irina@example.com" },
       ],
     },
     {
@@ -41,7 +47,7 @@ async function main() {
         { id: "sombrе", name: "Сомбре", description: "Естественное затемнение корней", price: "от 2 800₽" },
       ],
       masters: [
-        { id: "olga-color", name: "Ольга", role: "Колорист", instagram: "olga_color" },
+        { id: "olga-color", name: "Ольга", role: "Колорист", instagram: "olga_color", email: "olga@example.com" },
       ],
     },
     {
@@ -56,7 +62,7 @@ async function main() {
         { id: "moisture", name: "Увлажняющий комплекс", description: "SPA-уход для волос", price: "от 1 500₽" },
       ],
       masters: [
-        { id: "dmitry-massage", name: "Дмитрий", role: "Массажист", instagram: "dmitry_massage" },
+        { id: "dmitry-massage", name: "Дмитрий", role: "Массажист", instagram: "dmitry_massage", email: "dmitry@example.com" },
       ],
     },
     {
@@ -70,7 +76,7 @@ async function main() {
         { id: "pricheska", name: "Свадебная причёска", description: "Индивидуальный образ", price: "от 2 500₽" },
       ],
       masters: [
-        { id: "elena-styling", name: "Елена", role: "Визажист-стилист", instagram: "elena_styling" },
+        { id: "elena-styling", name: "Елена", role: "Визажист-стилист", instagram: "elena_styling", email: "elena@example.com" },
       ],
     },
     {
@@ -85,7 +91,7 @@ async function main() {
         { id: "narashchivanie", name: "Наращивание ногтей", description: "Гель, акригель", price: "от 2 000₽" },
       ],
       masters: [
-        { id: "svetlana-nails", name: "Светлана", role: "Мастер маникюра", instagram: "svetlana_nails" },
+        { id: "svetlana-nails", name: "Светлана", role: "Мастер маникюра", instagram: "svetlana_nails", email: "svetlana@example.com" },
       ],
     },
     {
@@ -101,8 +107,8 @@ async function main() {
         { id: "mezoterapiya", name: "Мезотерапия", description: "Инъекционная и безынъекционная", price: "от 3 500₽" },
       ],
       masters: [
-        { id: "ekaterina-cosmetology", name: "Екатерина", role: "Врач-косметолог", instagram: "ekaterina_cosmo" },
-        { id: "anna-cosmetology", name: "Анна", role: "Косметолог-эстетист", instagram: "anna_beauty" },
+        { id: "ekaterina-cosmetology", name: "Екатерина", role: "Врач-косметолог", instagram: "ekaterina_cosmo", email: "ekaterina@example.com" },
+        { id: "anna-cosmetology", name: "Анна", role: "Косметолог-эстетист", instagram: "anna_beauty", email: "anna@example.com" },
       ],
     },
   ];
@@ -141,7 +147,9 @@ async function main() {
           name: m.name,
           role: m.role,
           instagram: m.instagram,
-          workDays: "1,2,3,4,5",
+          email: (m as any).email || null,
+          password: masterCredentials[m.id] ? await bcrypt.hash(masterCredentials[m.id].password, 10) : null,
+          workDays: "1,2,3,4,5,6,0",
           startTime: "10:00",
           endTime: "20:00",
           breakStart: "13:00",
