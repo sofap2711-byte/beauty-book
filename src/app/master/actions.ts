@@ -103,7 +103,7 @@ export async function getMasterStats(masterId: string) {
       where: { slot: { masterId, date: { gte: today, lte: weekLater } }, status: { not: "cancelled" } },
     }),
     prisma.booking.count({
-      where: { slot: { masterId }, status: { not: "cancelled" } },
+      where: { slot: { masterId }, status: "confirmed" },
     }),
   ]);
 

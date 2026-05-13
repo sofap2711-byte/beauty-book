@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import {
   getBookings,
   cancelBooking,
@@ -141,7 +142,7 @@ export default function AdminDashboard() {
       (b) => b.slot.date >= monthStartStr && b.slot.date <= monthEndStrFormatted
     ).length;
     const activeCount = bookings.filter(
-      (b) => b.status === "confirmed" || b.status === "completed"
+      (b) => b.status === "confirmed"
     ).length;
     const newCount = bookings.filter((b) => b.status === "new").length;
 
@@ -273,15 +274,25 @@ export default function AdminDashboard() {
           </h1>
           <p className="text-slate-500 text-sm mt-1">Управление бронированиями</p>
         </div>
-        <form action={logoutAdmin}>
-          <Button
-            type="submit"
-            variant="outline"
-            className="rounded-none border-slate-300 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all text-sm"
-          >
-            Выйти
-          </Button>
-        </form>
+        <div className="flex items-center gap-3">
+          <Link href="/master/login">
+            <Button
+              variant="outline"
+              className="rounded-none border-slate-300 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all text-sm"
+            >
+              👤 Кабинет мастера
+            </Button>
+          </Link>
+          <form action={logoutAdmin}>
+            <Button
+              type="submit"
+              variant="outline"
+              className="rounded-none border-slate-300 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all text-sm"
+            >
+              Выйти
+            </Button>
+          </form>
+        </div>
       </div>
 
       {/* Stats cards */}

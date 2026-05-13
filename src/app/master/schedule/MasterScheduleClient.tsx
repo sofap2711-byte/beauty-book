@@ -45,9 +45,16 @@ export default function MasterScheduleClient({ masterId, initialData }: Props) {
   }
 
   function validate(): string | null {
+    if (workDays.length === 0) return "Выберите хотя бы один рабочий день";
+
     const start = parseInt(startTime.replace(":", ""), 10);
     const end = parseInt(endTime.replace(":", ""), 10);
     if (start >= end) return "Время начала должно быть меньше времени окончания";
+
+    const startMinAllowed = parseInt("07:00".replace(":", ""), 10);
+    const endMaxAllowed = parseInt("22:00".replace(":", ""), 10);
+    if (start < startMinAllowed) return "Начало работы не раньше 07:00";
+    if (end > endMaxAllowed) return "Окончание работы не позже 22:00";
 
     if (breakStart && breakEnd) {
       const bs = parseInt(breakStart.replace(":", ""), 10);
