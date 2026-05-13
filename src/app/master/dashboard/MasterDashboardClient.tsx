@@ -107,7 +107,7 @@ export default function MasterDashboardClient({ masterName, stats, bookings, fil
             Нет записей на выбранный период
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[1400px] text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-left text-slate-500">
                 <th className="px-4 py-3 font-normal whitespace-nowrap">Дата</th>

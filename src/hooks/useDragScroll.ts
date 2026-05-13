@@ -1,19 +1,21 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export function useDragScroll() {
-  const ref = useRef<HTMLDivElement>(null);
-  const isDown = useRef(false);
-  const startX = useRef(0);
-  const scrollLeft = useRef(0);
+  const [el, setEl] = useState<HTMLDivElement | null>(null);
+  const preventSelect = useCallback((e: Event) => {
+    e.preventDefault();
+  }, []);
 
   useEffect(() => {
-    const el = ref.current;
     if (!el) return;
 
+    let isDown = false;
+    let startX = 0;
+    let scrollLeft = 0;
+
     const onMouseDown = (e: MouseEvent) => {
-      // Don't drag if clicking on a button, link, input, etc.
       const target = e.target as HTMLElement;
       if (
         target.closest("button") ||
@@ -21,29 +23,37 @@ export function useDragScroll() {
         target.closest("input") ||
         target.closest("select") ||
         target.closest("textarea") ||
+        target.closest("label") ||
         target.closest("[role='dialog']")
       ) {
         return;
       }
-      isDown.current = true;
-      startX.current = e.pageX - el.offsetLeft;
-      scrollLeft.current = el.scrollLeft;
+      isDown = true;
+      startX = e.clientX;
+      scrollLeft = el.scrollLeft;
+      el.style.cursor = "grabbing";
+      document.addEventListener("selectstart", preventSelect);
     };
 
     const onMouseLeave = () => {
-      isDown.current = false;
+      if (!isDown) return;
+      isDown = false;
+      el.style.cursor = "grab";
+      document.removeEventListener("selectstart", preventSelect);
     };
 
     const onMouseUp = () => {
-      isDown.current = false;
+      if (!isDown) return;
+      isDown = false;
+      el.style.cursor = "grab";
+      document.removeEventListener("selectstart", preventSelect);
     };
 
     const onMouseMove = (e: MouseEvent) => {
-      if (!isDown.current) return;
+      if (!isDown) return;
       e.preventDefault();
-      const x = e.pageX - el.offsetLeft;
-      const walk = (x - startX.current) * 1.5;
-      el.scrollLeft = scrollLeft.current - walk;
+      const walk = (e.clientX - startX) * 1.5;
+      el.scrollLeft = scrollLeft - walk;
     };
 
     el.addEventListener("mousedown", onMouseDown);
@@ -56,8 +66,9 @@ export function useDragScroll() {
       el.removeEventListener("mouseleave", onMouseLeave);
       el.removeEventListener("mouseup", onMouseUp);
       el.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("selectstart", preventSelect);
     };
-  }, []);
+  }, [el, preventSelect]);
 
-  return ref;
+  return setEl;
 }

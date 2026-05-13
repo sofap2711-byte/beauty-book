@@ -412,7 +412,7 @@ export default function AdminDashboard() {
         <p className="text-sm text-slate-400">Нет записей</p>
       ) : (
         <div ref={scrollRef} className="bg-white border border-slate-100 overflow-x-auto drag-scroll">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[1600px] text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">
                 <th className="px-4 py-3 font-normal">Дата</th>

@@ -46,7 +46,16 @@
     -webkit-user-select: none;
   }
 
-  .drag-scroll:active {
-    cursor: grabbing;
+  .drag-scroll * {
+    cursor: grab !important;
+  }
+
+  .drag-scroll:active,
+  .drag-scroll:active * {
+    cursor: grabbing !important;
+  }
+
+  .drag-scroll::-webkit-scrollbar {
+    display: none;
   }
 }
