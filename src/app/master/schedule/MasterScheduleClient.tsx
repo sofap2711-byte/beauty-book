@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { updateMasterSchedule, generateSlotsForMaster } from "../actions";
+import { updateMasterSchedule } from "../actions";
 import { logoutMaster } from "../actions";
 import { toast } from "sonner";
 
@@ -12,8 +12,6 @@ interface Props {
     workDays: string;
     startTime: string;
     endTime: string;
-    breakStart: string | null;
-    breakEnd: string | null;
   };
 }
 
@@ -33,10 +31,7 @@ export default function MasterScheduleClient({ masterId, initialData }: Props) {
   );
   const [startTime, setStartTime] = useState(initialData.startTime);
   const [endTime, setEndTime] = useState(initialData.endTime);
-  const [breakStart, setBreakStart] = useState(initialData.breakStart || "");
-  const [breakEnd, setBreakEnd] = useState(initialData.breakEnd || "");
   const [saving, setSaving] = useState(false);
-  const [generating, setGenerating] = useState(false);
 
   function toggleDay(day: string) {
     setWorkDays((prev) =>
@@ -56,13 +51,6 @@ export default function MasterScheduleClient({ masterId, initialData }: Props) {
     if (start < startMinAllowed) return "Начало работы не раньше 07:00";
     if (end > endMaxAllowed) return "Окончание работы не позже 22:00";
 
-    if (breakStart && breakEnd) {
-      const bs = parseInt(breakStart.replace(":", ""), 10);
-      const be = parseInt(breakEnd.replace(":", ""), 10);
-      if (bs < start || be > end) return "Перерыв должен быть внутри рабочего времени";
-      if (bs >= be) return "Начало перерыва должно быть раньше конца";
-    }
-
     return null;
   }
 
@@ -79,32 +67,12 @@ export default function MasterScheduleClient({ masterId, initialData }: Props) {
         workDays: workDays.join(","),
         startTime,
         endTime,
-        breakStart: breakStart || undefined,
-        breakEnd: breakEnd || undefined,
       });
       toast.success("График сохранён");
     } catch {
       toast.error("Ошибка при сохранении");
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function handleGenerate() {
-    const error = validate();
-    if (error) {
-      toast.error(error);
-      return;
-    }
-
-    setGenerating(true);
-    try {
-      const result = await generateSlotsForMaster(masterId);
-      toast.success(`Сгенерировано ${result.created} слотов`);
-    } catch {
-      toast.error("Ошибка при генерации слотов");
-    } finally {
-      setGenerating(false);
     }
   }
 
@@ -204,48 +172,14 @@ export default function MasterScheduleClient({ masterId, initialData }: Props) {
             </div>
           </div>
 
-          {/* Break */}
-          <div className="mb-8">
-            <label className="block text-sm text-slate-600 mb-2">Перерыв (опционально)</label>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1.5">С</label>
-                <input
-                  type="time"
-                  value={breakStart}
-                  onChange={(e) => setBreakStart(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-slate-400 transition-colors"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1.5">До</label>
-                <input
-                  type="time"
-                  value={breakEnd}
-                  onChange={(e) => setBreakEnd(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-slate-400 transition-colors"
-                />
-              </div>
-            </div>
-          </div>
-
           {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-6 py-3 bg-slate-900 text-white text-sm tracking-wide hover:bg-slate-800 transition-colors disabled:opacity-50"
-            >
-              {saving ? "Сохранение..." : "Сохранить график"}
-            </button>
-            <button
-              onClick={handleGenerate}
-              disabled={generating}
-              className="px-6 py-3 border border-slate-300 text-slate-700 text-sm tracking-wide hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-colors disabled:opacity-50"
-            >
-              {generating ? "Генерация..." : "Сгенерировать слоты на 1 месяц"}
-            </button>
-          </div>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-6 py-3 bg-slate-900 text-white text-sm tracking-wide hover:bg-slate-800 transition-colors disabled:opacity-50"
+          >
+            {saving ? "Сохранение..." : "Сохранить график"}
+          </button>
         </div>
       </main>
     </div>

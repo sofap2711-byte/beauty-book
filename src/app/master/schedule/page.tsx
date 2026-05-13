@@ -15,8 +15,6 @@ export default async function MasterSchedulePage() {
         workDays: master.workDays,
         startTime: master.startTime,
         endTime: master.endTime,
-        breakStart: master.breakStart,
-        breakEnd: master.breakEnd,
       }}
     />
   );

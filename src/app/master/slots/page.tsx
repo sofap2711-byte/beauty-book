@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getMasterSession, getMasterSlotsByMonth } from "../actions";
+import { getMasterSession, getMasterSlotsForMonth } from "../actions";
 import MasterSlotsClient from "./MasterSlotsClient";
 
 export default async function MasterSlotsPage({
@@ -16,12 +16,15 @@ export default async function MasterSlotsPage({
   const year = searchParams.year ? parseInt(searchParams.year, 10) : now.getFullYear();
   const month = searchParams.month ? parseInt(searchParams.month, 10) : now.getMonth() + 1;
 
-  const slots = await getMasterSlotsByMonth(master.id, year, month);
+  const slotsByDate = await getMasterSlotsForMonth(master.id, year, month);
 
   return (
     <MasterSlotsClient
       masterId={master.id}
-      slots={slots}
+      workDays={master.workDays}
+      startTime={master.startTime}
+      endTime={master.endTime}
+      slotsByDate={slotsByDate}
       year={year}
       month={month}
     />

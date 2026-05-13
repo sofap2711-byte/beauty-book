@@ -46,7 +46,7 @@ export async function getMasterSession() {
 
   const master = await prisma.master.findUnique({
     where: { id: masterId },
-    select: { id: true, name: true, email: true, workDays: true, startTime: true, endTime: true, breakStart: true, breakEnd: true },
+    select: { id: true, name: true, email: true, workDays: true, startTime: true, endTime: true },
   });
 
   return master;
@@ -116,8 +116,6 @@ export async function updateMasterSchedule(
     workDays: string;
     startTime: string;
     endTime: string;
-    breakStart?: string;
-    breakEnd?: string;
   }
 ) {
   const updated = await prisma.master.update({
@@ -126,8 +124,6 @@ export async function updateMasterSchedule(
       workDays: data.workDays,
       startTime: data.startTime,
       endTime: data.endTime,
-      breakStart: data.breakStart || null,
-      breakEnd: data.breakEnd || null,
     },
   });
 
@@ -135,108 +131,97 @@ export async function updateMasterSchedule(
   return updated;
 }
 
-export async function generateSlotsForMaster(masterId: string) {
+export async function generateSlotsForDay(masterId: string, date: string, interval: number) {
   const master = await prisma.master.findUnique({ where: { id: masterId } });
   if (!master) throw new Error("Мастер не найден");
 
   const workDays = master.workDays.split(",").map((d) => parseInt(d.trim(), 10));
+  const dateObj = new Date(date + "T00:00:00");
+  const dayOfWeek = dateObj.getDay();
+
+  if (!workDays.includes(dayOfWeek)) {
+    throw new Error("Это выходной день по графику");
+  }
+
   const startHour = parseInt(master.startTime.split(":")[0], 10);
   const startMin = parseInt(master.startTime.split(":")[1], 10);
   const endHour = parseInt(master.endTime.split(":")[0], 10);
   const endMin = parseInt(master.endTime.split(":")[1], 10);
 
-  const breakStartHour = master.breakStart ? parseInt(master.breakStart.split(":")[0], 10) : null;
-  const breakStartMin = master.breakStart ? parseInt(master.breakStart.split(":")[1], 10) : null;
-  const breakEndHour = master.breakEnd ? parseInt(master.breakEnd.split(":")[0], 10) : null;
-  const breakEndMin = master.breakEnd ? parseInt(master.breakEnd.split(":")[1], 10) : null;
+  const slots: { masterId: string; date: string; time: string; interval: number; status: string }[] = [];
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString().split("T")[0];
+  const currentDate = new Date(dateObj);
+  currentDate.setHours(startHour, startMin, 0, 0);
+  const end = new Date(dateObj);
+  end.setHours(endHour, endMin, 0, 0);
 
-  // Delete old free slots
-  await prisma.slot.deleteMany({
-    where: {
+  while (currentDate < end) {
+    const h = currentDate.getHours().toString().padStart(2, "0");
+    const m = currentDate.getMinutes().toString().padStart(2, "0");
+    const timeStr = `${h}:${m}`;
+
+    slots.push({
       masterId,
+      date,
+      time: timeStr,
+      interval,
       status: "free",
-      date: { lt: todayStr },
-    },
-  });
-
-  const slots: { masterId: string; date: string; time: string; status: string }[] = [];
-
-  for (let day = 0; day < 30; day++) {
-    const date = new Date(today);
-    date.setDate(today.getDate() + day);
-    const dateStr = date.toISOString().split("T")[0];
-    const dayOfWeek = date.getDay();
-
-    if (!workDays.includes(dayOfWeek)) continue;
-
-    const currentDate = new Date(date);
-    currentDate.setHours(startHour, startMin, 0, 0);
-    const end = new Date(date);
-    end.setHours(endHour, endMin, 0, 0);
-
-    while (currentDate < end) {
-      const h = currentDate.getHours().toString().padStart(2, "0");
-      const m = currentDate.getMinutes().toString().padStart(2, "0");
-      const timeStr = `${h}:${m}`;
-
-      // Skip break time
-      if (breakStartHour !== null && breakEndHour !== null) {
-        const breakStart = new Date(date);
-        breakStart.setHours(breakStartHour, breakStartMin || 0, 0, 0);
-        const breakEnd = new Date(date);
-        breakEnd.setHours(breakEndHour, breakEndMin || 0, 0, 0);
-
-        if (currentDate >= breakStart && currentDate < breakEnd) {
-          currentDate.setMinutes(currentDate.getMinutes() + 30);
-          continue;
-        }
-      }
-
-      slots.push({
-        masterId,
-        date: dateStr,
-        time: timeStr,
-        status: "free",
-      });
-
-      currentDate.setMinutes(currentDate.getMinutes() + 30);
-    }
-  }
-
-  // Batch insert with skip duplicates
-  const batchSize = 500;
-  for (let i = 0; i < slots.length; i += batchSize) {
-    await prisma.slot.createMany({
-      data: slots.slice(i, i + batchSize),
-      skipDuplicates: true,
     });
+
+    currentDate.setMinutes(currentDate.getMinutes() + interval);
   }
+
+  await prisma.slot.createMany({
+    data: slots,
+    skipDuplicates: true,
+  });
 
   revalidatePath("/master/slots");
   return { created: slots.length };
 }
 
-export async function getMasterSlotsByMonth(masterId: string, year: number, month: number) {
+export async function getMasterSlotsForMonth(masterId: string, year: number, month: number) {
   const startOfMonth = `${year}-${String(month).padStart(2, "0")}-01`;
   const endOfMonth = `${year}-${String(month).padStart(2, "0")}-31`;
 
-  return prisma.slot.findMany({
+  const slots = await prisma.slot.findMany({
     where: {
       masterId,
       date: { gte: startOfMonth, lte: endOfMonth },
     },
-    orderBy: [{ date: "asc" }, { time: "asc" }],
+    select: { date: true, status: true, interval: true },
+  });
+
+  // Group by date
+  const grouped: Record<string, { total: number; booked: number; blocked: number; free: number; interval: number }> = {};
+
+  for (const slot of slots) {
+    if (!grouped[slot.date]) {
+      grouped[slot.date] = { total: 0, booked: 0, blocked: 0, free: 0, interval: slot.interval };
+    }
+    grouped[slot.date].total++;
+    if (slot.status === "booked") grouped[slot.date].booked++;
+    else if (slot.status === "blocked") grouped[slot.date].blocked++;
+    else if (slot.status === "free") grouped[slot.date].free++;
+  }
+
+  return Object.entries(grouped).map(([date, stats]) => ({ date, ...stats }));
+}
+
+export async function getMasterSlotsForDay(masterId: string, date: string) {
+  return prisma.slot.findMany({
+    where: { masterId, date },
+    include: { booking: true },
+    orderBy: { time: "asc" },
   });
 }
 
-export async function toggleSlotStatus(slotId: string, newStatus: string) {
+export async function toggleSlotStatus(slotId: string) {
   const slot = await prisma.slot.findUnique({ where: { id: slotId } });
   if (!slot) throw new Error("Слот не найден");
   if (slot.status === "booked") throw new Error("Нельзя изменить занятый слот");
+
+  const newStatus = slot.status === "free" ? "blocked" : "free";
 
   const updated = await prisma.slot.update({
     where: { id: slotId },
@@ -245,4 +230,41 @@ export async function toggleSlotStatus(slotId: string, newStatus: string) {
 
   revalidatePath("/master/slots");
   return updated;
+}
+
+export async function closeAllFreeSlots(masterId: string, date: string) {
+  const result = await prisma.slot.updateMany({
+    where: { masterId, date, status: "free" },
+    data: { status: "blocked" },
+  });
+
+  revalidatePath("/master/slots");
+  return { count: result.count };
+}
+
+export async function openAllBlockedSlots(masterId: string, date: string) {
+  const result = await prisma.slot.updateMany({
+    where: { masterId, date, status: "blocked" },
+    data: { status: "free" },
+  });
+
+  revalidatePath("/master/slots");
+  return { count: result.count };
+}
+
+export async function deleteSlotsForDay(masterId: string, date: string) {
+  const bookedCount = await prisma.slot.count({
+    where: { masterId, date, status: "booked" },
+  });
+
+  if (bookedCount > 0) {
+    throw new Error(`Нельзя удалить: ${bookedCount} записанных клиентов`);
+  }
+
+  const result = await prisma.slot.deleteMany({
+    where: { masterId, date },
+  });
+
+  revalidatePath("/master/slots");
+  return { count: result.count };
 }

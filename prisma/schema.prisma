@@ -37,8 +37,6 @@ model Master {
   workDays    String
   startTime   String
   endTime     String
-  breakStart  String?
-  breakEnd    String?
   email       String?  @unique
   password    String?
   isActive    Boolean  @default(true)
@@ -53,6 +51,7 @@ model Slot {
   master      Master   @relation(fields: [masterId], references: [id])
   date        String
   time        String
+  interval    Int      @default(30)
   status      String   @default("free")
   clientName  String?
   clientPhone String?

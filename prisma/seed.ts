@@ -152,8 +152,6 @@ async function main() {
           workDays: "0,1,2,3,4,5,6",
           startTime: "07:00",
           endTime: "22:00",
-          breakStart: "13:00",
-          breakEnd: "14:00",
           serviceId: service.id,
         },
       });
@@ -163,8 +161,6 @@ async function main() {
         date.setDate(today.getDate() + day);
         const dateStr = date.toISOString().split("T")[0];
         const dayOfWeek = date.getDay();
-
-        if (dayOfWeek === 0 || dayOfWeek === 6) continue;
 
         let hash = 0;
         for (let i = 0; i < (master.id + dateStr).length; i++) {
@@ -184,6 +180,7 @@ async function main() {
             masterId: master.id,
             date: dateStr,
             time,
+            interval: 30,
             status: isBooked ? "booked" : "free",
             clientName: isBooked ? "Демо-клиент" : null,
             clientPhone: isBooked ? "+79991234567" : null,
