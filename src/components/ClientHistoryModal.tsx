@@ -7,29 +7,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { X } from "lucide-react";
+import { X, FileText } from "lucide-react";
 import { getClientHistory } from "@/app/actions";
 import { toast } from "sonner";
 import type { TimeBlock, Master, Service } from "@prisma/client";
 
 type BlockWithMaster = TimeBlock & {
   master: Master & { service: Service };
-};
-
-const statusLabels: Record<string, string> = {
-  confirmed: "Подтверждена",
-  completed: "Завершена",
-  cancelled: "Отменена",
-  "no-show": "Не пришёл",
-  new: "Новая",
-};
-
-const statusColors: Record<string, string> = {
-  new: "bg-amber-100 text-amber-700 border-amber-200",
-  confirmed: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  completed: "bg-slate-100 text-slate-500 border-slate-200",
-  cancelled: "bg-red-100 text-red-600 border-red-200",
-  "no-show": "bg-red-50 text-red-400 border-red-100",
 };
 
 interface Props {
@@ -63,9 +47,9 @@ export default function ClientHistoryModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-none bg-white border border-slate-200 shadow-2xl w-[90vw] max-w-[700px] max-h-[85vh] overflow-hidden p-0">
+      <DialogContent className="rounded-none bg-white border border-slate-200 shadow-2xl w-[90vw] max-w-[500px] max-h-[85vh] overflow-hidden p-0">
         {/* Header */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100 flex flex-row items-center justify-between">
+        <DialogHeader className="px-4 pt-4 pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
           <DialogTitle className="font-serif text-xl font-300 text-slate-900">
             История клиента
           </DialogTitle>
@@ -77,9 +61,9 @@ export default function ClientHistoryModal({
           </button>
         </DialogHeader>
 
-        <div className="px-6 py-4 space-y-4 overflow-y-auto">
+        <div className="px-4 py-3 space-y-3 overflow-y-auto">
           {/* Client info */}
-          <div className="bg-slate-50 border border-slate-100 px-4 py-3 text-sm">
+          <div className="bg-slate-50 border border-slate-100 px-3 py-2.5 text-sm">
             <p>
               <span className="text-slate-400">Имя:</span>{" "}
               <span className="text-slate-900">{name || "—"}</span>
@@ -111,13 +95,10 @@ export default function ClientHistoryModal({
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wider text-slate-400">
                     <th className="py-2 px-2 font-normal">Дата</th>
-                    <th className="py-2 px-2 font-normal">Время</th>
                     <th className="py-2 px-2 font-normal">Мастер</th>
                     <th className="py-2 px-2 font-normal">Услуга</th>
-                    <th className="py-2 px-2 font-normal">Статус</th>
-                    {!masterId && (
-                      <th className="py-2 px-2 font-normal text-right">Стоимость</th>
-                    )}
+                    <th className="py-2 px-2 font-normal text-right">💰</th>
+                    <th className="py-2 px-2 font-normal text-center">📝</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -127,29 +108,29 @@ export default function ClientHistoryModal({
                         {new Date(h.date).toLocaleDateString("ru-RU")}
                       </td>
                       <td className="py-2 px-2 text-slate-700 whitespace-nowrap">
-                        {h.startTime} – {h.endTime}
-                      </td>
-                      <td className="py-2 px-2 text-slate-700 whitespace-nowrap">
                         {h.master.name}
                       </td>
                       <td className="py-2 px-2 text-slate-500 whitespace-nowrap">
                         {h.serviceName || h.master.service.name}
                       </td>
-                      <td className="py-2 px-2 whitespace-nowrap">
+                      <td className="py-2 px-2 text-right whitespace-nowrap text-slate-700">
+                        {h.price ? `${h.price.toLocaleString("ru-RU")} ₽` : "—"}
+                      </td>
+                      <td className="py-2 px-2 whitespace-nowrap text-center">
                         <span
-                          className={`inline-flex items-center px-1.5 py-0.5 text-xs border ${
-                            statusColors[h.status] ||
-                            "bg-slate-100 text-slate-500 border-slate-200"
-                          }`}
+                          title={h.comment || undefined}
+                          className="inline-flex items-center justify-center"
                         >
-                          {statusLabels[h.status] || h.status}
+                          <FileText
+                            className={`w-4 h-4 ${
+                              h.comment
+                                ? "text-sky-400"
+                                : "text-slate-300"
+                            }`}
+                            strokeWidth={1.5}
+                          />
                         </span>
                       </td>
-                      {!masterId && (
-                        <td className="py-2 px-2 text-right whitespace-nowrap text-slate-700">
-                          {h.price ? `${h.price.toLocaleString("ru-RU")} ₽` : "—"}
-                        </td>
-                      )}
                     </tr>
                   ))}
                 </tbody>
