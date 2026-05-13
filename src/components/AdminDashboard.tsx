@@ -18,19 +18,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import type { Booking, Slot, Master, Service } from "@prisma/client";
+import type { TimeBlock, Master, Service } from "@prisma/client";
 
-type BookingWithSlot = Booking & {
-  slot: Slot & {
-    master: Master & { service: Service };
-  };
+type BlockWithMaster = TimeBlock & {
+  master: Master & { service: Service };
 };
 
 const statusLabels: Record<string, string> = {
-  new: "Новая",
   confirmed: "Подтверждена",
   completed: "Завершена",
   cancelled: "Отменена",
+  "no-show": "Не пришёл",
+  new: "Новая",
 };
 
 const statusColors: Record<string, string> = {
@@ -38,6 +37,7 @@ const statusColors: Record<string, string> = {
   confirmed: "bg-emerald-100 text-emerald-700 border-emerald-200",
   completed: "bg-slate-100 text-slate-500 border-slate-200",
   cancelled: "bg-red-100 text-red-600 border-red-200",
+  "no-show": "bg-red-50 text-red-400 border-red-100",
 };
 
 const periodLabels: Record<string, string> = {
@@ -68,7 +68,7 @@ function formatDateStr(d: Date): string {
 }
 
 export default function AdminDashboard() {
-  const [bookings, setBookings] = useState<BookingWithSlot[]>([]);
+  const [blocks, setBlocks] = useState<BlockWithMaster[]>([]);
   const [loading, setLoading] = useState(true);
   const [tableFilterDate, setTableFilterDate] = useState<string>("all");
   const [filterMaster, setFilterMaster] = useState<string>("all");
@@ -84,11 +84,11 @@ export default function AdminDashboard() {
   const [historyName, setHistoryName] = useState("");
   const [historyTg, setHistoryTg] = useState("");
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyData, setHistoryData] = useState<BookingWithSlot[]>([]);
+  const [historyData, setHistoryData] = useState<BlockWithMaster[]>([]);
 
   // Notes modal
   const [notesOpen, setNotesOpen] = useState(false);
-  const [notesBookingId, setNotesBookingId] = useState("");
+  const [notesBlockId, setNotesBlockId] = useState("");
   const [notesValue, setNotesValue] = useState("");
   const [notesSaving, setNotesSaving] = useState(false);
 
@@ -96,7 +96,7 @@ export default function AdminDashboard() {
     setLoading(true);
     getBookings()
       .then((data) => {
-        setBookings(data as BookingWithSlot[]);
+        setBlocks(data as BlockWithMaster[]);
         setLoading(false);
       })
       .catch(() => {
@@ -134,20 +134,20 @@ export default function AdminDashboard() {
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     const monthEndStrFormatted = formatDateStr(monthEnd);
 
-    const todayCount = bookings.filter((b) => b.slot.date === todayStr).length;
-    const weekCount = bookings.filter(
-      (b) => b.slot.date >= mondayStr && b.slot.date <= sundayStr
+    const todayCount = blocks.filter((b) => formatDateStr(new Date(b.date)) === todayStr).length;
+    const weekCount = blocks.filter(
+      (b) => formatDateStr(new Date(b.date)) >= mondayStr && formatDateStr(new Date(b.date)) <= sundayStr
     ).length;
-    const monthCount = bookings.filter(
-      (b) => b.slot.date >= monthStartStr && b.slot.date <= monthEndStrFormatted
+    const monthCount = blocks.filter(
+      (b) => formatDateStr(new Date(b.date)) >= monthStartStr && formatDateStr(new Date(b.date)) <= monthEndStrFormatted
     ).length;
-    const activeCount = bookings.filter(
+    const activeCount = blocks.filter(
       (b) => b.status === "confirmed"
     ).length;
-    const newCount = bookings.filter((b) => b.status === "new").length;
+    const newCount = blocks.filter((b) => b.source === "online" && b.status === "confirmed").length;
 
     return { todayCount, weekCount, monthCount, activeCount, newCount };
-  }, [bookings, todayStr]);
+  }, [blocks, todayStr]);
 
   const statValue = useMemo(() => {
     switch (statPeriod) {
@@ -163,27 +163,18 @@ export default function AdminDashboard() {
   }, [stats, statPeriod]);
 
   const filtered = useMemo(() => {
-    return bookings.filter((b) => {
-      if (tableFilterDate === "today" && b.slot.date !== todayStr) return false;
-      if (tableFilterDate === "tomorrow" && b.slot.date !== tomorrowStr)
-        return false;
-      if (
-        tableFilterDate === "week" &&
-        (b.slot.date < todayStr || b.slot.date > weekEndStr)
-      )
-        return false;
-      if (
-        tableFilterDate === "month" &&
-        (b.slot.date < todayStr || b.slot.date > monthEndStr)
-      )
-        return false;
-      if (filterMaster !== "all" && b.slot.master.id !== filterMaster)
-        return false;
+    return blocks.filter((b) => {
+      const dateStr = formatDateStr(new Date(b.date));
+      if (tableFilterDate === "today" && dateStr !== todayStr) return false;
+      if (tableFilterDate === "tomorrow" && dateStr !== tomorrowStr) return false;
+      if (tableFilterDate === "week" && (dateStr < todayStr || dateStr > weekEndStr)) return false;
+      if (tableFilterDate === "month" && (dateStr < todayStr || dateStr > monthEndStr)) return false;
+      if (filterMaster !== "all" && b.master.id !== filterMaster) return false;
       if (filterStatus !== "all" && b.status !== filterStatus) return false;
       return true;
     });
   }, [
-    bookings,
+    blocks,
     tableFilterDate,
     filterMaster,
     filterStatus,
@@ -195,13 +186,13 @@ export default function AdminDashboard() {
 
   const masters = useMemo(() => {
     const map = new Map<string, string>();
-    bookings.forEach((b) => map.set(b.slot.master.id, b.slot.master.name));
+    blocks.forEach((b) => map.set(b.master.id, b.master.name));
     return Array.from(map.entries());
-  }, [bookings]);
+  }, [blocks]);
 
-  const handleCancel = async (bookingId: string, slotId: string) => {
+  const handleCancel = async (blockId: string) => {
     try {
-      await cancelBooking(slotId);
+      await cancelBooking(blockId);
       toast.success("Запись отменена");
       load();
     } catch {
@@ -209,9 +200,9 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleStatusChange = async (bookingId: string, status: string) => {
+  const handleStatusChange = async (blockId: string, status: string) => {
     try {
-      await updateBookingStatus(bookingId, status);
+      await updateBookingStatus(blockId, status);
       toast.success("Статус обновлён");
       load();
     } catch {
@@ -231,7 +222,7 @@ export default function AdminDashboard() {
     setHistoryLoading(true);
     try {
       const data = await getClientHistory(phone);
-      setHistoryData(data as BookingWithSlot[]);
+      setHistoryData(data as BlockWithMaster[]);
     } catch {
       toast.error("Ошибка загрузки истории");
     } finally {
@@ -239,17 +230,17 @@ export default function AdminDashboard() {
     }
   };
 
-  const openNotes = (bookingId: string, currentNotes?: string | null) => {
-    setNotesBookingId(bookingId);
+  const openNotes = (blockId: string, currentNotes?: string | null) => {
+    setNotesBlockId(blockId);
     setNotesValue(currentNotes || "");
     setNotesOpen(true);
   };
 
   const saveNotes = async () => {
-    if (!notesBookingId) return;
+    if (!notesBlockId) return;
     setNotesSaving(true);
     try {
-      await updateAdminNotes(notesBookingId, notesValue);
+      await updateAdminNotes(notesBlockId, notesValue);
       toast.success("Заметки сохранены");
       setNotesOpen(false);
       load();
@@ -400,9 +391,9 @@ export default function AdminDashboard() {
           className="rounded-none border border-slate-200 px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:border-sky-300"
         >
           <option value="all">Все статусы</option>
-          <option value="new">Новая</option>
           <option value="confirmed">Подтверждена</option>
           <option value="completed">Завершена</option>
+          <option value="cancelled">Отменена</option>
         </select>
         <Button
           onClick={load}
@@ -442,31 +433,29 @@ export default function AdminDashboard() {
                   className="hover:bg-slate-50/50 transition-colors"
                 >
                   <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
-                    {new Date(
-                      b.slot.date + "T00:00:00"
-                    ).toLocaleDateString("ru-RU")}
+                    {new Date(b.date).toLocaleDateString("ru-RU")}
                   </td>
                   <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
-                    {b.slot.time}
+                    {b.startTime} – {b.endTime}
                   </td>
                   <td className="px-4 py-3 text-slate-900 whitespace-nowrap">
-                    {b.slot.master.name}
+                    {b.master.name}
                   </td>
                   <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                    {b.slot.master.service.name}
+                    {b.serviceName || b.master.service.name}
                   </td>
                   <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
                     <button
                       onClick={() =>
-                        openHistory(b.clientPhone, b.clientName, b.clientTg)
+                        openHistory(b.clientPhone || "", b.clientName || "", b.clientTg)
                       }
                       className="hover:text-sky-600 hover:underline transition-colors cursor-pointer"
                     >
-                      {b.clientName}
+                      {b.clientName || "—"}
                     </button>
                   </td>
                   <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                    {b.clientPhone}
+                    {b.clientPhone || "—"}
                   </td>
                   <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
                     {b.clientTg || "—"}
@@ -495,18 +484,6 @@ export default function AdminDashboard() {
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1">
-                      {b.status === "new" && (
-                        <Button
-                          onClick={() =>
-                            handleStatusChange(b.id, "confirmed")
-                          }
-                          variant="outline"
-                          size="sm"
-                          className="rounded-none border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 transition-all text-xs"
-                        >
-                          Подтвердить
-                        </Button>
-                      )}
                       {b.status === "confirmed" && (
                         <Button
                           onClick={() =>
@@ -521,7 +498,7 @@ export default function AdminDashboard() {
                       )}
                       {b.status !== "completed" && b.status !== "cancelled" && (
                         <Button
-                          onClick={() => handleCancel(b.id, b.slotId)}
+                          onClick={() => handleCancel(b.id)}
                           variant="outline"
                           size="sm"
                           className="rounded-none border-red-200 text-red-500 hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition-all text-xs"
@@ -588,18 +565,16 @@ export default function AdminDashboard() {
                     {historyData.map((h) => (
                       <tr key={h.id} className="hover:bg-slate-50/50">
                         <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
-                          {new Date(
-                            h.slot.date + "T00:00:00"
-                          ).toLocaleDateString("ru-RU")}
+                          {new Date(h.date).toLocaleDateString("ru-RU")}
                         </td>
                         <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
-                          {h.slot.time}
+                          {h.startTime} – {h.endTime}
                         </td>
                         <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
-                          {h.slot.master.name}
+                          {h.master.name}
                         </td>
                         <td className="px-3 py-2 text-slate-500 whitespace-nowrap">
-                          {h.slot.master.service.name}
+                          {h.serviceName || h.master.service.name}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           <span

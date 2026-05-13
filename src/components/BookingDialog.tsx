@@ -15,9 +15,10 @@ import { toast } from "sonner";
 
 interface BookingDialogProps {
   trigger: React.ReactNode;
-  slotId: string;
+  masterId: string;
   date: string;
   time: string;
+  duration: number;
   masterName: string;
   onSuccess?: () => void;
 }
@@ -32,11 +33,20 @@ function validatePhone(phone: string): { valid: boolean; message?: string } {
   };
 }
 
+function addMinutes(time: string, minutes: number): string {
+  const [h, m] = time.split(":").map(Number);
+  const total = h * 60 + m + minutes;
+  const nh = Math.floor(total / 60);
+  const nm = total % 60;
+  return `${nh.toString().padStart(2, "0")}:${nm.toString().padStart(2, "0")}`;
+}
+
 export default function BookingDialog({
   trigger,
-  slotId,
+  masterId,
   date,
   time,
+  duration,
   masterName,
   onSuccess,
 }: BookingDialogProps) {
@@ -51,6 +61,8 @@ export default function BookingDialog({
   const [phoneError, setPhoneError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const endTime = addMinutes(time, duration);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPhoneError("");
@@ -64,9 +76,13 @@ export default function BookingDialog({
     setSubmitting(true);
     try {
       await createBooking(
-        slotId,
+        masterId,
+        date,
+        time,
+        endTime,
         form.name,
         form.phone,
+        masterName,
         form.telegram || undefined,
         form.comment || undefined
       );
@@ -82,7 +98,7 @@ export default function BookingDialog({
     } catch (err) {
       let msg = "Ошибка при записи";
       if (err instanceof Error) msg = err.message;
-      if (msg.includes("уже занят")) {
+      if (msg.includes("пересекается")) {
         toast.error("Извините, это время только что заняли");
       } else {
         toast.error(msg);
@@ -122,7 +138,7 @@ export default function BookingDialog({
                 <span className="text-slate-700">Дата:</span> {date}
               </p>
               <p>
-                <span className="text-slate-700">Время:</span> {time}
+                <span className="text-slate-700">Время:</span> {time} – {endTime}
               </p>
             </div>
 

@@ -1,15 +1,23 @@
 "use client";
 
 import { useParams, notFound } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { getMasterById, getMasterSlots } from "@/app/actions";
+import { getMasterById, getMasterTimeBlocks } from "@/app/actions";
 import Nav from "@/components/Nav";
 import Calendar from "@/components/Calendar";
 import BookingDialog from "@/components/BookingDialog";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import type { Master, Slot } from "@prisma/client";
+import type { Master } from "@prisma/client";
+
+interface TimeBlock {
+  id: string;
+  startTime: string;
+  endTime: string;
+  type: string;
+  status: string;
+}
 
 export default function BookPage() {
   const params = useParams();
@@ -17,9 +25,9 @@ export default function BookPage() {
 
   const [master, setMaster] = useState<Master | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [slots, setSlots] = useState<Slot[]>([]);
+  const [blocks, setBlocks] = useState<TimeBlock[]>([]);
   const [loading, setLoading] = useState(true);
-  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [blocksLoading, setBlocksLoading] = useState(false);
 
   useEffect(() => {
     getMasterById(masterId)
@@ -33,12 +41,12 @@ export default function BookPage() {
       });
   }, [masterId]);
 
-  const loadSlots = useCallback(
+  const loadBlocks = useCallback(
     (date: string) => {
-      setSlotsLoading(true);
-      getMasterSlots(masterId, date).then((data) => {
-        setSlots(data);
-        setSlotsLoading(false);
+      setBlocksLoading(true);
+      getMasterTimeBlocks(masterId, date).then((data) => {
+        setBlocks(data);
+        setBlocksLoading(false);
       });
     },
     [masterId]
@@ -46,9 +54,45 @@ export default function BookPage() {
 
   useEffect(() => {
     if (selectedDate) {
-      loadSlots(selectedDate);
+      loadBlocks(selectedDate);
     }
-  }, [selectedDate, loadSlots]);
+  }, [selectedDate, loadBlocks]);
+
+  const slots = useMemo(() => {
+    if (!master) return [];
+    const startMin = parseInt(master.startTime.split(":")[0]) * 60 + parseInt(master.startTime.split(":")[1]);
+    const endMin = parseInt(master.endTime.split(":")[0]) * 60 + parseInt(master.endTime.split(":")[1]);
+
+    const occupied = blocks
+      .filter((b) => b.status !== "cancelled")
+      .map((b) => ({
+        start: parseInt(b.startTime.split(":")[0]) * 60 + parseInt(b.startTime.split(":")[1]),
+        end: parseInt(b.endTime.split(":")[0]) * 60 + parseInt(b.endTime.split(":")[1]),
+      }))
+      .sort((a, b) => a.start - b.start);
+
+    const result: { time: string; duration: number }[] = [];
+    let current = startMin;
+
+    for (const occ of occupied) {
+      while (current + 30 <= occ.start && current + 30 <= endMin) {
+        const h = Math.floor(current / 60).toString().padStart(2, "0");
+        const m = (current % 60).toString().padStart(2, "0");
+        result.push({ time: `${h}:${m}`, duration: 30 });
+        current += 30;
+      }
+      current = Math.max(current, occ.end);
+    }
+
+    while (current + 30 <= endMin) {
+      const h = Math.floor(current / 60).toString().padStart(2, "0");
+      const m = (current % 60).toString().padStart(2, "0");
+      result.push({ time: `${h}:${m}`, duration: 30 });
+      current += 30;
+    }
+
+    return result;
+  }, [blocks, master]);
 
   if (!loading && !master) {
     notFound();
@@ -103,46 +147,29 @@ export default function BookPage() {
               })}
             </h2>
 
-            {slotsLoading ? (
-              <p className="text-sm text-slate-400">Загрузка слотов...</p>
+            {blocksLoading ? (
+              <p className="text-sm text-slate-400">Загрузка...</p>
             ) : slots.length > 0 ? (
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                {slots.map((slot) => {
-                  if (slot.status === "booked") {
-                    return (
-                      <div
-                        key={slot.id}
-                        className="flex flex-col items-center justify-center border border-slate-200 bg-slate-100 py-3 px-2"
+                {slots.map((slot) => (
+                  <BookingDialog
+                    key={slot.time}
+                    masterId={masterId}
+                    date={selectedDate}
+                    time={slot.time}
+                    duration={slot.duration}
+                    masterName={master.name}
+                    onSuccess={() => loadBlocks(selectedDate)}
+                    trigger={
+                      <Button
+                        variant="outline"
+                        className="w-full rounded-none border-slate-300 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all text-sm py-5"
                       >
-                        <span className="text-sm font-medium text-slate-400 line-through">
-                          {slot.time}
-                        </span>
-                        <span className="text-[10px] text-slate-300 mt-0.5 uppercase tracking-wider">
-                          занято
-                        </span>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <BookingDialog
-                      key={slot.id}
-                      slotId={slot.id}
-                      date={selectedDate}
-                      time={slot.time}
-                      masterName={master.name}
-                      onSuccess={() => loadSlots(selectedDate)}
-                      trigger={
-                        <Button
-                          variant="outline"
-                          className="w-full rounded-none border-slate-300 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all text-sm py-5"
-                        >
-                          {slot.time}
-                        </Button>
-                      }
-                    />
-                  );
-                })}
+                        {slot.time}
+                      </Button>
+                    }
+                  />
+                ))}
               </div>
             ) : (
               <p className="text-sm text-slate-400">Нет доступных слотов на эту дату</p>

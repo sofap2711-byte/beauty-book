@@ -5,7 +5,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Protect master dashboard pages
-  if (pathname.startsWith("/master/dashboard") || pathname.startsWith("/master/schedule") || pathname.startsWith("/master/slots")) {
+  if (pathname.startsWith("/master/dashboard") || pathname.startsWith("/master/schedule") || pathname.startsWith("/master/diary")) {
     const masterSession = request.cookies.get("master_session")?.value;
     if (!masterSession) {
       return NextResponse.redirect(new URL("/master/login", request.url));

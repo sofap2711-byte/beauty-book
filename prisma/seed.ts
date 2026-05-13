@@ -9,8 +9,7 @@ const masterCredentials: Record<string, { email: string; password: string }> = {
 };
 
 async function main() {
-  await prisma.booking.deleteMany();
-  await prisma.slot.deleteMany();
+  await prisma.timeBlock.deleteMany();
   await prisma.master.deleteMany();
   await prisma.subService.deleteMany();
   await prisma.service.deleteMany();
@@ -120,7 +119,7 @@ async function main() {
   ];
 
   const today = new Date();
-  const slotsBatch: any[] = [];
+  const timeBlocksBatch: any[] = [];
 
   for (const s of servicesData) {
     const service = await prisma.service.create({
@@ -159,8 +158,8 @@ async function main() {
       for (let day = 0; day < 14; day++) {
         const date = new Date(today);
         date.setDate(today.getDate() + day);
+        date.setHours(0, 0, 0, 0);
         const dateStr = date.toISOString().split("T")[0];
-        const dayOfWeek = date.getDay();
 
         let hash = 0;
         for (let i = 0; i < (master.id + dateStr).length; i++) {
@@ -176,53 +175,39 @@ async function main() {
         for (const time of timeLabels) {
           const r = rand(seed++);
           const isBooked = r < 0.3;
-          slotsBatch.push({
+          const [h, min] = time.split(":").map(Number);
+          const start = new Date(date);
+          start.setHours(h, min, 0, 0);
+          const end = new Date(start.getTime() + 30 * 60000);
+          const endTime = `${end.getHours().toString().padStart(2, "0")}:${end.getMinutes().toString().padStart(2, "0")}`;
+
+          timeBlocksBatch.push({
             masterId: master.id,
-            date: dateStr,
-            time,
-            interval: 30,
-            status: isBooked ? "booked" : "free",
+            date: date,
+            startTime: time,
+            endTime: endTime,
+            type: isBooked ? "booking" : "blocked",
             clientName: isBooked ? "Демо-клиент" : null,
             clientPhone: isBooked ? "+79991234567" : null,
             clientTg: isBooked ? "@demo" : null,
+            serviceName: isBooked ? service.name : null,
+            source: isBooked ? "online" : "manual",
+            status: isBooked ? "confirmed" : "confirmed",
           });
         }
       }
     }
   }
 
-  // Batch insert all slots at once for speed
+  // Batch insert all time blocks at once for speed
   const batchSize = 500;
-  for (let i = 0; i < slotsBatch.length; i += batchSize) {
-    await prisma.slot.createMany({
-      data: slotsBatch.slice(i, i + batchSize),
-      skipDuplicates: true,
+  for (let i = 0; i < timeBlocksBatch.length; i += batchSize) {
+    await prisma.timeBlock.createMany({
+      data: timeBlocksBatch.slice(i, i + batchSize),
     });
   }
 
-  // Create Booking records for all booked demo slots
-  const bookedSlots = await prisma.slot.findMany({
-    where: { status: "booked" },
-    select: { id: true, clientName: true, clientPhone: true, clientTg: true, comment: true },
-  });
-
-  const bookingsBatch = bookedSlots.map((slot) => ({
-    slotId: slot.id,
-    clientName: slot.clientName || "Демо-клиент",
-    clientPhone: slot.clientPhone || "+79991234567",
-    clientTg: slot.clientTg,
-    comment: slot.comment,
-    status: "new",
-  }));
-
-  for (let i = 0; i < bookingsBatch.length; i += batchSize) {
-    await prisma.booking.createMany({
-      data: bookingsBatch.slice(i, i + batchSize),
-      skipDuplicates: true,
-    });
-  }
-
-  console.log("Seed completed successfully. Slots created:", slotsBatch.length, "Bookings created:", bookingsBatch.length);
+  console.log("Seed completed successfully. TimeBlocks created:", timeBlocksBatch.length);
 }
 
 main()

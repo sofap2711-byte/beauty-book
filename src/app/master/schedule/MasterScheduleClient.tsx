@@ -111,10 +111,10 @@ export default function MasterScheduleClient({ masterId, initialData }: Props) {
             График
           </Link>
           <Link
-            href="/master/slots"
+            href="/master/diary"
             className="py-3 text-sm text-slate-500 hover:text-slate-900 transition-colors"
           >
-            Слоты
+            Дневник
           </Link>
         </div>
       </nav>

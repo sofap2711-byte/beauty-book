@@ -53,11 +53,14 @@ export async function getMasterSession() {
 }
 
 export async function getMasterBookings(masterId: string, filter?: string) {
-  const today = new Date().toISOString().split("T")[0];
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
-  const weekLater = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const weekLater = new Date(today);
+  weekLater.setDate(today.getDate() + 7);
 
-  let dateFilter: { gte?: string; lte?: string } = {};
+  let dateFilter: { gte?: Date; lte?: Date } = {};
 
   if (filter === "today") {
     dateFilter = { gte: today, lte: today };
@@ -66,44 +69,44 @@ export async function getMasterBookings(masterId: string, filter?: string) {
   } else if (filter === "week") {
     dateFilter = { gte: today, lte: weekLater };
   } else if (filter === "month") {
-    const monthLater = new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0];
+    const monthLater = new Date(today);
+    monthLater.setDate(today.getDate() + 30);
     dateFilter = { gte: today, lte: monthLater };
   }
 
-  const bookings = await prisma.booking.findMany({
+  const blocks = await prisma.timeBlock.findMany({
     where: {
-      slot: {
-        masterId,
-        ...(filter ? { date: dateFilter } : {}),
-      },
+      masterId,
+      type: "booking",
       status: { not: "cancelled" },
+      ...(filter ? { date: dateFilter } : {}),
     },
-    include: {
-      slot: true,
-    },
-    orderBy: [{ slot: { date: "asc" } }, { slot: { time: "asc" } }],
+    orderBy: [{ date: "asc" }, { startTime: "asc" }],
   });
 
-  return bookings;
+  return blocks;
 }
 
 export async function getMasterStats(masterId: string) {
-  const today = new Date().toISOString().split("T")[0];
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
-  const weekLater = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const weekLater = new Date(today);
+  weekLater.setDate(today.getDate() + 7);
 
   const [todayCount, tomorrowCount, weekCount, totalCount] = await Promise.all([
-    prisma.booking.count({
-      where: { slot: { masterId, date: today }, status: { not: "cancelled" } },
+    prisma.timeBlock.count({
+      where: { masterId, type: "booking", date: today, status: { not: "cancelled" } },
     }),
-    prisma.booking.count({
-      where: { slot: { masterId, date: tomorrow }, status: { not: "cancelled" } },
+    prisma.timeBlock.count({
+      where: { masterId, type: "booking", date: tomorrow, status: { not: "cancelled" } },
     }),
-    prisma.booking.count({
-      where: { slot: { masterId, date: { gte: today, lte: weekLater } }, status: { not: "cancelled" } },
+    prisma.timeBlock.count({
+      where: { masterId, type: "booking", date: { gte: today, lte: weekLater }, status: { not: "cancelled" } },
     }),
-    prisma.booking.count({
-      where: { slot: { masterId }, status: "confirmed" },
+    prisma.timeBlock.count({
+      where: { masterId, type: "booking", status: "confirmed" },
     }),
   ]);
 
@@ -131,140 +134,173 @@ export async function updateMasterSchedule(
   return updated;
 }
 
-export async function generateSlotsForDay(masterId: string, date: string, interval: number) {
-  const master = await prisma.master.findUnique({ where: { id: masterId } });
-  if (!master) throw new Error("Мастер не найден");
+// ===== TimeBlock Actions =====
 
-  const workDays = master.workDays.split(",").map((d) => parseInt(d.trim(), 10));
-  const dateObj = new Date(date + "T00:00:00");
-  const dayOfWeek = dateObj.getDay();
-
-  if (!workDays.includes(dayOfWeek)) {
-    throw new Error("Это выходной день по графику");
-  }
-
-  const startHour = parseInt(master.startTime.split(":")[0], 10);
-  const startMin = parseInt(master.startTime.split(":")[1], 10);
-  const endHour = parseInt(master.endTime.split(":")[0], 10);
-  const endMin = parseInt(master.endTime.split(":")[1], 10);
-
-  const slots: { masterId: string; date: string; time: string; interval: number; status: string }[] = [];
-
-  const currentDate = new Date(dateObj);
-  currentDate.setHours(startHour, startMin, 0, 0);
-  const end = new Date(dateObj);
-  end.setHours(endHour, endMin, 0, 0);
-
-  while (currentDate < end) {
-    const h = currentDate.getHours().toString().padStart(2, "0");
-    const m = currentDate.getMinutes().toString().padStart(2, "0");
-    const timeStr = `${h}:${m}`;
-
-    slots.push({
-      masterId,
-      date,
-      time: timeStr,
-      interval,
-      status: "free",
-    });
-
-    currentDate.setMinutes(currentDate.getMinutes() + interval);
-  }
-
-  await prisma.slot.createMany({
-    data: slots,
-    skipDuplicates: true,
-  });
-
-  revalidatePath("/master/slots");
-  return { created: slots.length };
+function parseTime(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
 }
 
-export async function getMasterSlotsForMonth(masterId: string, year: number, month: number) {
-  const startOfMonth = `${year}-${String(month).padStart(2, "0")}-01`;
-  const endOfMonth = `${year}-${String(month).padStart(2, "0")}-31`;
+export async function getMasterDayBlocks(masterId: string, date: string) {
+  const d = new Date(date + "T00:00:00");
+  return prisma.timeBlock.findMany({
+    where: { masterId, date: d },
+    orderBy: { startTime: "asc" },
+  });
+}
 
-  const slots = await prisma.slot.findMany({
+export async function checkOverlap(
+  masterId: string,
+  date: string,
+  startTime: string,
+  endTime: string,
+  excludeBlockId?: string
+) {
+  const d = new Date(date + "T00:00:00");
+
+  const overlapping = await prisma.timeBlock.findFirst({
     where: {
       masterId,
-      date: { gte: startOfMonth, lte: endOfMonth },
+      date: d,
+      status: { not: "cancelled" },
+      OR: [
+        { startTime: { lt: endTime }, endTime: { gt: startTime } },
+      ],
+      ...(excludeBlockId ? { id: { not: excludeBlockId } } : {}),
     },
-    select: { date: true, status: true, interval: true },
   });
+  return overlapping;
+}
 
-  // Group by date
-  const grouped: Record<string, { total: number; booked: number; blocked: number; free: number; interval: number }> = {};
+export async function createTimeBlock(data: {
+  masterId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  type: string;
+  clientName?: string;
+  clientPhone?: string;
+  clientTg?: string;
+  serviceName?: string;
+  comment?: string;
+}) {
+  const d = new Date(data.date + "T00:00:00");
 
-  for (const slot of slots) {
-    if (!grouped[slot.date]) {
-      grouped[slot.date] = { total: 0, booked: 0, blocked: 0, free: 0, interval: slot.interval };
-    }
-    grouped[slot.date].total++;
-    if (slot.status === "booked") grouped[slot.date].booked++;
-    else if (slot.status === "blocked") grouped[slot.date].blocked++;
-    else if (slot.status === "free") grouped[slot.date].free++;
+  // Validate times
+  if (parseTime(data.startTime) >= parseTime(data.endTime)) {
+    throw new Error("Время окончания должно быть позже начала");
   }
 
-  return Object.entries(grouped).map(([date, stats]) => ({ date, ...stats }));
+  // Check overlap
+  const overlap = await checkOverlap(data.masterId, data.date, data.startTime, data.endTime);
+  if (overlap) {
+    throw new Error(`Пересечение с записью ${overlap.startTime}–${overlap.endTime}`);
+  }
+
+  const block = await prisma.timeBlock.create({
+    data: {
+      masterId: data.masterId,
+      date: d,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      type: data.type,
+      clientName: data.clientName || null,
+      clientPhone: data.clientPhone || null,
+      clientTg: data.clientTg || null,
+      serviceName: data.serviceName || null,
+      comment: data.comment || null,
+      source: "manual",
+      status: data.type === "booking" ? "confirmed" : "confirmed",
+    },
+  });
+
+  revalidatePath("/master/diary");
+  return block;
 }
 
-export async function getMasterSlotsForDay(masterId: string, date: string) {
-  return prisma.slot.findMany({
-    where: { masterId, date },
-    include: { booking: true },
-    orderBy: { time: "asc" },
+export async function updateTimeBlock(
+  blockId: string,
+  data: {
+    startTime?: string;
+    endTime?: string;
+    serviceName?: string;
+    comment?: string;
+    status?: string;
+  }
+) {
+  const block = await prisma.timeBlock.findUnique({ where: { id: blockId } });
+  if (!block) throw new Error("Запись не найдена");
+
+  // Validate times if both provided
+  if (data.startTime && data.endTime) {
+    if (parseTime(data.startTime) >= parseTime(data.endTime)) {
+      throw new Error("Время окончания должно быть позже начала");
+    }
+    const overlap = await checkOverlap(
+      block.masterId,
+      block.date.toISOString().split("T")[0],
+      data.startTime,
+      data.endTime,
+      blockId
+    );
+    if (overlap) {
+      throw new Error(`Пересечение с записью ${overlap.startTime}–${overlap.endTime}`);
+    }
+  }
+
+  const updated = await prisma.timeBlock.update({
+    where: { id: blockId },
+    data: {
+      ...(data.startTime !== undefined && { startTime: data.startTime }),
+      ...(data.endTime !== undefined && { endTime: data.endTime }),
+      ...(data.serviceName !== undefined && { serviceName: data.serviceName }),
+      ...(data.comment !== undefined && { comment: data.comment }),
+      ...(data.status !== undefined && { status: data.status }),
+    },
   });
-}
 
-export async function toggleSlotStatus(slotId: string) {
-  const slot = await prisma.slot.findUnique({ where: { id: slotId } });
-  if (!slot) throw new Error("Слот не найден");
-  if (slot.status === "booked") throw new Error("Нельзя изменить занятый слот");
-
-  const newStatus = slot.status === "free" ? "blocked" : "free";
-
-  const updated = await prisma.slot.update({
-    where: { id: slotId },
-    data: { status: newStatus },
-  });
-
-  revalidatePath("/master/slots");
+  revalidatePath("/master/diary");
   return updated;
 }
 
-export async function closeAllFreeSlots(masterId: string, date: string) {
-  const result = await prisma.slot.updateMany({
-    where: { masterId, date, status: "free" },
-    data: { status: "blocked" },
-  });
+export async function deleteTimeBlock(blockId: string) {
+  const block = await prisma.timeBlock.findUnique({ where: { id: blockId } });
+  if (!block) throw new Error("Запись не найдена");
 
-  revalidatePath("/master/slots");
-  return { count: result.count };
-}
-
-export async function openAllBlockedSlots(masterId: string, date: string) {
-  const result = await prisma.slot.updateMany({
-    where: { masterId, date, status: "blocked" },
-    data: { status: "free" },
-  });
-
-  revalidatePath("/master/slots");
-  return { count: result.count };
-}
-
-export async function deleteSlotsForDay(masterId: string, date: string) {
-  const bookedCount = await prisma.slot.count({
-    where: { masterId, date, status: "booked" },
-  });
-
-  if (bookedCount > 0) {
-    throw new Error(`Нельзя удалить: ${bookedCount} записанных клиентов`);
+  if (block.source === "online" && block.status !== "cancelled") {
+    throw new Error("Нельзя удалить онлайн-запись. Отмените её через изменение статуса.");
   }
 
-  const result = await prisma.slot.deleteMany({
-    where: { masterId, date },
+  await prisma.timeBlock.delete({ where: { id: blockId } });
+
+  revalidatePath("/master/diary");
+  return { success: true };
+}
+
+export async function getMasterBlocksForMonth(masterId: string, year: number, month: number) {
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0);
+
+  const blocks = await prisma.timeBlock.findMany({
+    where: {
+      masterId,
+      date: { gte: start, lte: end },
+      status: { not: "cancelled" },
+    },
+    select: { date: true, type: true, status: true },
   });
 
-  revalidatePath("/master/slots");
-  return { count: result.count };
+  const grouped: Record<string, { hasBooking: boolean; hasBlocked: boolean; count: number }> = {};
+
+  for (const block of blocks) {
+    const dateKey = block.date.toISOString().split("T")[0];
+    if (!grouped[dateKey]) {
+      grouped[dateKey] = { hasBooking: false, hasBlocked: false, count: 0 };
+    }
+    grouped[dateKey].count++;
+    if (block.type === "booking") grouped[dateKey].hasBooking = true;
+    if (block.type === "blocked") grouped[dateKey].hasBlocked = true;
+  }
+
+  return Object.entries(grouped).map(([date, stats]) => ({ date, ...stats }));
 }

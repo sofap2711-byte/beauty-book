@@ -54,90 +54,92 @@ export async function getMastersByService(serviceId: string) {
   }
 }
 
-export async function getMasterSlots(masterId: string, date: string) {
+export async function getMasterTimeBlocks(masterId: string, date: string) {
   try {
-    return await prisma.slot.findMany({
-      where: { masterId, date },
-      orderBy: { time: "asc" },
+    const d = new Date(date + "T00:00:00");
+    return await prisma.timeBlock.findMany({
+      where: {
+        masterId,
+        date: d,
+        type: "booking",
+        status: { not: "cancelled" },
+      },
+      orderBy: { startTime: "asc" },
     });
   } catch (err) {
-    console.error("[getMasterSlots] error:", err);
+    console.error("[getMasterTimeBlocks] error:", err);
     throw err;
   }
 }
 
 export async function createBooking(
-  slotId: string,
+  masterId: string,
+  date: string,
+  startTime: string,
+  endTime: string,
   clientName: string,
   clientPhone: string,
+  serviceName: string,
   clientTg?: string,
   comment?: string
 ) {
-  const slot = await prisma.slot.findUnique({ where: { id: slotId } });
-  if (!slot) throw new Error("Слот не найден");
-  if (slot.status !== "free") throw new Error("Слот уже занят");
+  const d = new Date(date + "T00:00:00");
 
-  const [updatedSlot] = await prisma.$transaction([
-    prisma.slot.update({
-      where: { id: slotId, status: "free" },
-      data: {
-        status: "booked",
-        clientName,
-        clientPhone,
-        clientTg: clientTg || null,
-        comment: comment || null,
-      },
-    }),
-    prisma.booking.create({
-      data: {
-        slotId,
-        clientName,
-        clientPhone,
-        clientTg: clientTg || null,
-        comment: comment || null,
-        status: "new",
-      },
-    }),
-  ]);
+  // Check overlap
+  const overlap = await prisma.timeBlock.findFirst({
+    where: {
+      masterId,
+      date: d,
+      OR: [
+        { startTime: { lt: endTime }, endTime: { gt: startTime } },
+      ],
+      status: { not: "cancelled" },
+    },
+  });
+
+  if (overlap) {
+    throw new Error("Выбранное время пересекается с существующей записью");
+  }
+
+  const block = await prisma.timeBlock.create({
+    data: {
+      masterId,
+      date: d,
+      startTime,
+      endTime,
+      type: "booking",
+      clientName,
+      clientPhone,
+      clientTg: clientTg || null,
+      comment: comment || null,
+      serviceName,
+      source: "online",
+      status: "confirmed",
+    },
+  });
 
   revalidatePath("/admin");
-  return updatedSlot;
+  return block;
 }
 
 export async function getBookings() {
-  return prisma.booking.findMany({
-    where: { status: { not: "cancelled" } },
-    include: {
-      slot: {
-        include: {
-          master: { include: { service: true } },
-        },
-      },
+  return prisma.timeBlock.findMany({
+    where: {
+      type: "booking",
+      status: { not: "cancelled" },
     },
-    orderBy: [{ slot: { date: "asc" } }, { slot: { time: "asc" } }],
+    include: {
+      master: { include: { service: true } },
+    },
+    orderBy: [{ date: "asc" }, { startTime: "asc" }],
   });
 }
 
-export async function cancelBooking(slotId: string) {
-  const booking = await prisma.booking.findUnique({
-    where: { slotId },
-  });
-
-  if (booking) {
-    await prisma.booking.update({
-      where: { id: booking.id },
-      data: { status: "cancelled" },
-    });
-  }
-
-  const updated = await prisma.slot.update({
-    where: { id: slotId },
+export async function cancelBooking(blockId: string) {
+  const updated = await prisma.timeBlock.update({
+    where: { id: blockId },
     data: {
-      status: "free",
-      clientName: null,
-      clientPhone: null,
-      clientTg: null,
-      comment: null,
+      status: "cancelled",
     },
   });
 
@@ -145,9 +147,9 @@ export async function cancelBooking(slotId: string) {
   return updated;
 }
 
-export async function updateBookingStatus(bookingId: string, status: string) {
-  const updated = await prisma.booking.update({
-    where: { id: bookingId },
+export async function updateBookingStatus(blockId: string, status: string) {
+  const updated = await prisma.timeBlock.update({
+    where: { id: blockId },
     data: { status },
   });
 
@@ -155,9 +157,9 @@ export async function updateBookingStatus(bookingId: string, status: string) {
   return updated;
 }
 
-export async function updateAdminNotes(bookingId: string, notes: string) {
-  const updated = await prisma.booking.update({
-    where: { id: bookingId },
+export async function updateAdminNotes(blockId: string, notes: string) {
+  const updated = await prisma.timeBlock.update({
+    where: { id: blockId },
     data: { adminNotes: notes || null },
   });
 
@@ -166,15 +168,14 @@ export async function updateAdminNotes(bookingId: string, notes: string) {
 }
 
 export async function getClientHistory(clientPhone: string) {
-  return prisma.booking.findMany({
-    where: { clientPhone },
-    include: {
-      slot: {
-        include: {
-          master: { include: { service: true } },
-        },
-      },
+  return prisma.timeBlock.findMany({
+    where: {
+      clientPhone,
+      type: "booking",
     },
-    orderBy: [{ slot: { date: "desc" } }, { slot: { time: "desc" } }],
+    include: {
+      master: { include: { service: true } },
+    },
+    orderBy: [{ date: "desc" }, { startTime: "desc" }],
   });
 }

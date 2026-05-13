@@ -5,38 +5,40 @@ import { useRouter } from "next/navigation";
 import { logoutMaster } from "../actions";
 import { Calendar, Clock, User, Phone, MessageCircle, FileText, Tag } from "lucide-react";
 
-interface Booking {
+interface TimeBlockItem {
   id: string;
   status: string;
-  slot: {
-    date: string;
-    time: string;
-    clientName: string | null;
-    clientPhone: string | null;
-    clientTg: string | null;
-    comment: string | null;
-  };
+  date: Date | string;
+  startTime: string;
+  endTime: string;
+  clientName: string | null;
+  clientPhone: string | null;
+  clientTg: string | null;
+  comment: string | null;
+  serviceName: string | null;
 }
 
 interface Props {
   masterName: string;
   stats: { today: number; tomorrow: number; week: number; total: number };
-  bookings: Booking[];
+  bookings: TimeBlockItem[];
   filter: string;
 }
 
 const statusLabels: Record<string, string> = {
-  new: "Новая",
   confirmed: "Подтверждена",
   completed: "Выполнена",
   cancelled: "Отменена",
+  "no-show": "Не пришёл",
+  new: "Новая",
 };
 
 const statusColors: Record<string, string> = {
-  new: "bg-sky-100 text-sky-700",
   confirmed: "bg-emerald-100 text-emerald-700",
   completed: "bg-slate-100 text-slate-600",
   cancelled: "bg-red-100 text-red-700",
+  "no-show": "bg-red-50 text-red-500",
+  new: "bg-sky-100 text-sky-700",
 };
 
 export default function MasterDashboardClient({ masterName, stats, bookings, filter }: Props) {
@@ -49,6 +51,11 @@ export default function MasterDashboardClient({ masterName, stats, bookings, fil
     { key: "month", label: "Месяц" },
     { key: "", label: "Все" },
   ];
+
+  function formatDate(date: Date | string): string {
+    const d = typeof date === "string" ? new Date(date) : date;
+    return d.toLocaleDateString("ru-RU");
+  }
 
   return (
     <div className="min-h-screen bg-[#f8f9fa]">
@@ -88,10 +95,10 @@ export default function MasterDashboardClient({ masterName, stats, bookings, fil
             График
           </Link>
           <Link
-            href="/master/slots"
+            href="/master/diary"
             className="py-3 text-sm text-slate-500 hover:text-slate-900 transition-colors"
           >
-            Слоты
+            Дневник
           </Link>
         </div>
       </nav>
@@ -159,37 +166,37 @@ export default function MasterDashboardClient({ masterName, stats, bookings, fil
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        {b.slot.date}
+                        {formatDate(b.date)}
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <Clock className="w-3.5 h-3.5 text-slate-400" />
-                        {b.slot.time}
+                        {b.startTime} – {b.endTime}
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <User className="w-3.5 h-3.5 text-slate-400" />
-                        {b.slot.clientName || "—"}
+                        {b.clientName || "—"}
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap hidden md:table-cell">
                       <div className="flex items-center gap-1.5">
                         <Phone className="w-3.5 h-3.5 text-slate-400" />
-                        {b.slot.clientPhone || "—"}
+                        {b.clientPhone || "—"}
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap hidden lg:table-cell">
                       <div className="flex items-center gap-1.5">
                         <MessageCircle className="w-3.5 h-3.5 text-slate-400" />
-                        {b.slot.clientTg || "—"}
+                        {b.clientTg || "—"}
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap hidden lg:table-cell max-w-xs truncate">
                       <div className="flex items-center gap-1.5">
                         <FileText className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                        {b.slot.comment || "—"}
+                        {b.comment || "—"}
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
