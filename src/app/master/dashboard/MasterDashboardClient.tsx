@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useDragScroll } from "@/hooks/useDragScroll";
 import { Calendar, Clock, User, Phone, MessageCircle, FileText, Tag } from "lucide-react";
 
 interface TimeBlockItem {
@@ -41,6 +42,7 @@ const statusColors: Record<string, string> = {
 
 export default function MasterDashboardClient({ masterName, stats, bookings, filter }: Props) {
   const router = useRouter();
+  const scrollRef = useDragScroll();
 
   const filters = [
     { key: "today", label: "Сегодня" },
@@ -99,7 +101,7 @@ export default function MasterDashboardClient({ masterName, stats, bookings, fil
       </div>
 
       {/* Bookings Table */}
-      <div className="bg-white border border-slate-200 overflow-x-auto">
+      <div ref={scrollRef} className="bg-white border border-slate-200 overflow-x-auto drag-scroll">
         {bookings.length === 0 ? (
           <div className="p-8 text-center text-slate-500 text-sm">
             Нет записей на выбранный период

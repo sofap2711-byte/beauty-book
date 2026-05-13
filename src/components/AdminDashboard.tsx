@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useDragScroll } from "@/hooks/useDragScroll";
 import Link from "next/link";
 import {
   getBookings,
@@ -68,6 +69,7 @@ function formatDateStr(d: Date): string {
 }
 
 export default function AdminDashboard() {
+  const scrollRef = useDragScroll();
   const [blocks, setBlocks] = useState<BlockWithMaster[]>([]);
   const [loading, setLoading] = useState(true);
   const [tableFilterDate, setTableFilterDate] = useState<string>("all");
@@ -409,7 +411,7 @@ export default function AdminDashboard() {
       ) : filtered.length === 0 ? (
         <p className="text-sm text-slate-400">Нет записей</p>
       ) : (
-        <div className="bg-white border border-slate-100 overflow-x-auto">
+        <div ref={scrollRef} className="bg-white border border-slate-100 overflow-x-auto drag-scroll">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400">

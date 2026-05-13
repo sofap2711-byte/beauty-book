@@ -38,3 +38,15 @@
     font-family: var(--font-serif), serif;
   }
 }
+
+@layer utilities {
+  .drag-scroll {
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .drag-scroll:active {
+    cursor: grabbing;
+  }
+}
