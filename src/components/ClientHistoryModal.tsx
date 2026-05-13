@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { X, FileText } from "lucide-react";
+import { X, FileText, Banknote } from "lucide-react";
 import { getClientHistory } from "@/app/actions";
 import { toast } from "sonner";
 import type { TimeBlock, Master, Service } from "@prisma/client";
@@ -47,9 +47,9 @@ export default function ClientHistoryModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-none bg-white border border-slate-200 shadow-2xl w-[90vw] max-w-[500px] max-h-[85vh] overflow-hidden p-0">
+      <DialogContent className="rounded-none bg-white border border-slate-200 shadow-2xl w-[92vw] max-w-[800px] max-h-[85vh] overflow-hidden p-0">
         {/* Header */}
-        <DialogHeader className="px-4 pt-4 pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
+        <DialogHeader className="px-5 pt-5 pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
           <DialogTitle className="font-serif text-xl font-300 text-slate-900">
             История клиента
           </DialogTitle>
@@ -61,9 +61,9 @@ export default function ClientHistoryModal({
           </button>
         </DialogHeader>
 
-        <div className="px-4 py-3 space-y-3 overflow-y-auto">
+        <div className="px-5 py-4 space-y-4 overflow-y-auto">
           {/* Client info */}
-          <div className="bg-slate-50 border border-slate-100 px-3 py-2.5 text-sm">
+          <div className="bg-slate-50 border border-slate-100 px-4 py-3 text-sm">
             <p>
               <span className="text-slate-400">Имя:</span>{" "}
               <span className="text-slate-900">{name || "—"}</span>
@@ -93,30 +93,34 @@ export default function ClientHistoryModal({
             <div>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wider text-slate-400">
-                    <th className="py-2 px-2 font-normal">Дата</th>
-                    <th className="py-2 px-2 font-normal">Мастер</th>
-                    <th className="py-2 px-2 font-normal">Услуга</th>
-                    <th className="py-2 px-2 font-normal text-right">💰</th>
-                    <th className="py-2 px-2 font-normal text-center">📝</th>
+                  <tr className="border-b border-slate-200 text-left text-[11px] uppercase tracking-wider text-slate-400">
+                    <th className="py-2 px-3 font-normal">Дата</th>
+                    <th className="py-2 px-3 font-normal">Мастер</th>
+                    <th className="py-2 px-3 font-normal">Услуга</th>
+                    <th className="py-2 px-3 font-normal text-center">
+                      <Banknote className="w-4 h-4 inline-block" strokeWidth={1.5} />
+                    </th>
+                    <th className="py-2 px-3 font-normal text-center">
+                      <FileText className="w-4 h-4 inline-block" strokeWidth={1.5} />
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {data.map((h) => (
                     <tr key={h.id} className="hover:bg-slate-50/50">
-                      <td className="py-2 px-2 text-slate-700 whitespace-nowrap">
+                      <td className="py-2 px-3 text-slate-700 whitespace-nowrap">
                         {new Date(h.date).toLocaleDateString("ru-RU")}
                       </td>
-                      <td className="py-2 px-2 text-slate-700 whitespace-nowrap">
+                      <td className="py-2 px-3 text-slate-700 whitespace-nowrap">
                         {h.master.name}
                       </td>
-                      <td className="py-2 px-2 text-slate-500 whitespace-nowrap">
+                      <td className="py-2 px-3 text-slate-500 whitespace-nowrap">
                         {h.serviceName || h.master.service.name}
                       </td>
-                      <td className="py-2 px-2 text-right whitespace-nowrap text-slate-700">
+                      <td className="py-2 px-3 text-center whitespace-nowrap text-slate-700">
                         {h.price ? `${h.price.toLocaleString("ru-RU")} ₽` : "—"}
                       </td>
-                      <td className="py-2 px-2 whitespace-nowrap text-center">
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
                         <span
                           title={h.comment || undefined}
                           className="inline-flex items-center justify-center"
